@@ -5,6 +5,11 @@
 // then run testTelegram() to confirm the notification arrives.
 // To update an existing deployment WITHOUT changing its URL:
 // Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
+//
+// NOTE: the column layout changed (FB / Contact Via / Pickup / Delivery /
+// Add-ons / Preferences were added). If you already have an "Orders" sheet
+// from an older version, rename it (e.g. "Orders-old") and run setupSheet()
+// again so new orders land under the right headers.
 
 // ===== Telegram settings =====
 const TELEGRAM_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"; // from @BotFather
@@ -13,11 +18,16 @@ const TELEGRAM_CHAT_ID = "PASTE_YOUR_CHAT_ID_HERE";     // from getUpdates
 // ===== Sheet settings =====
 const SHEET_NAME = "Orders";
 const HEADERS = [
-  "Receipt No", "Received At", "Status", "Name", "Phone", "Address",
-  "Loads", "Bango", "Speed", "Notes", "Total (PHP)",
+  "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
+  "Address", "Pickup", "Delivery", "Loads", "Bango", "Add-ons", "Preferences",
+  "Speed", "Notes", "Total (PHP)",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
+
+// How many pickups/deliveries the rider can handle in one hourly slot.
+// The form asks GET ?action=slots&date=YYYY-MM-DD and disables full slots.
+const SLOT_CAP = 2;
 
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
@@ -31,6 +41,8 @@ function doPost(e) {
   const loadsText = (data.loads || [])
     .map(function (l) { return l.label + " " + (l.qty || l.kg) + (l.unit || "kg") + " = P" + l.amount; })
     .join("\n");
+  const addonsText = (data.addons || []).join("\n");
+  const prefsText = (data.prefs || []).join("\n");
 
   sheet.appendRow([
     data.receiptNo,
@@ -38,9 +50,17 @@ function doPost(e) {
     "NEW",
     data.name,
     "'" + data.phone, // keep leading zero by storing as text
+    data.fb || "",
+    data.contactVia || "",
     data.address,
+    // "'"-prefix keeps these as text "YYYY-MM-DD HH:00" — Sheets would
+    // otherwise convert them to Date values and break the slot counting below
+    data.pickup ? "'" + data.pickup : "",
+    data.delivery ? "'" + data.delivery : "",
     loadsText,
     data.bango,
+    addonsText,
+    prefsText,
     data.speed,
     data.notes,
     data.total,
@@ -50,10 +70,16 @@ function doPost(e) {
   try {
     sendTelegram(
       "🧺 New order " + data.receiptNo + "\n" +
-      "👤 " + data.name + " / " + data.phone + "\n" +
-      "📍 " + data.address + "\n\n" +
+      "👤 " + data.name + " / " + data.phone +
+      (data.fb ? " / FB: " + data.fb : "") + "\n" +
+      "📱 Contact via: " + (data.contactVia || "-") + "\n" +
+      "📍 " + data.address + "\n" +
+      "🚚 Pickup: " + (data.pickup || "-") + "\n" +
+      "🏠 Delivery: " + (data.delivery || "-") + "\n\n" +
       loadsText + "\n\n" +
       "🌸 Bango: " + data.bango + " / ⏱ " + data.speed +
+      (addonsText ? "\n➕ " + (data.addons || []).join(", ") : "") +
+      (prefsText ? "\n✅ " + (data.prefs || []).join(", ") : "") +
       (data.notes ? "\n📝 " + data.notes : "") + "\n" +
       "💰 Total: P" + data.total + " (estimate)"
     );
@@ -61,7 +87,40 @@ function doPost(e) {
     console.error("Telegram notify failed: " + err);
   }
 
-  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+  return jsonOut({ ok: true });
+}
+
+// GET ?action=slots&date=YYYY-MM-DD
+// Returns { cap, counts: { "08:00": 1, ... } } — how many pickups + deliveries
+// are already booked per hourly slot on that date (cancelled orders excluded).
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.action === "slots" && p.date) {
+    const counts = {};
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (sheet && sheet.getLastRow() > 1) {
+      const iStatus = HEADERS.indexOf("Status");
+      const iPickup = HEADERS.indexOf("Pickup");
+      const iDelivery = HEADERS.indexOf("Delivery");
+      const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+      rows.forEach(function (r) {
+        if (String(r[iStatus]) === "CANCELLED") return;
+        [r[iPickup], r[iDelivery]].forEach(function (v) {
+          v = String(v || "");
+          if (v.indexOf(p.date) === 0) {
+            const slot = v.slice(11, 16); // "HH:00"
+            counts[slot] = (counts[slot] || 0) + 1;
+          }
+        });
+      });
+    }
+    return jsonOut({ cap: SLOT_CAP, counts: counts });
+  }
+  return jsonOut({ ok: true });
+}
+
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
