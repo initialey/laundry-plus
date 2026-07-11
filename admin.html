@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laundry+ Admin | Slot Schedule</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗓️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sky: #3fb4e6;
+  --sky-deep: #1e9ad2;
+  --white: #ffffff;
+  --ink: #1d7db3;
+  --ink-deep: #14618d;
+  --yellow: #ffd23f;
+  --yellow-deep: #f5b820;
+  --pink: #f06fa8;
+  --green: #2eb872;
+  --red: #e05a5a;
+  --display: "Baloo 2", cursive;
+  --body: "Poppins", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { overflow-x: hidden; }
+body { font-family: var(--body); background: var(--sky); color: var(--white); min-height: 100vh; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 26px 16px 60px; }
+header { text-align: center; margin-bottom: 18px; }
+header h1 { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1.1; }
+header p { font-weight: 700; font-size: 13px; opacity: .9; margin-top: 2px; }
+.card {
+  background: var(--white);
+  color: var(--ink-deep);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 5px 0 rgba(20, 97, 141, .28);
+  margin-bottom: 14px;
+}
+label.lbl { display: block; font-weight: 800; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin-bottom: 5px; }
+input, button.btn {
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+input {
+  width: 100%;
+  color: var(--ink-deep);
+  background: #eef8fd;
+  border: 2px solid #cdeaf8;
+}
+input:focus { outline: none; border-color: var(--sky); box-shadow: 0 0 0 3px rgba(63,180,230,.25); }
+.keyrow { display: flex; gap: 8px; }
+button.btn {
+  border: 0;
+  background: var(--yellow);
+  color: var(--ink-deep);
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--yellow-deep);
+  white-space: nowrap;
+}
+button.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow-deep); }
+.datebar { display: flex; align-items: center; gap: 8px; }
+.datebar .nav {
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+  border: 2px solid #cdeaf8;
+  background: #eef8fd;
+  color: var(--sky-deep);
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.datebar .nav:hover { border-color: var(--sky); }
+.datebar .cur { flex: 1; text-align: center; }
+.datebar .cur .d { font-weight: 700; font-size: 17px; color: var(--sky-deep); }
+.datebar .cur .sub { font-weight: 700; font-size: 11px; color: #6aa9c9; }
+.datebar .today { font-size: 12px; padding: 8px 12px; }
+.slots { display: flex; flex-direction: column; gap: 8px; }
+.slot {
+  border: 2px solid #cdeaf8;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.slot.full { border-color: var(--pink); background: #fdf1f7; }
+.slot.blocked { border-color: #b9c7d1; background: #f2f5f7; }
+.slot .top { display: flex; align-items: center; gap: 10px; }
+.slot .time { font-weight: 700; font-size: 14px; color: var(--ink-deep); flex: 1; }
+.slot .cnt { font-weight: 700; font-size: 13px; color: var(--sky-deep); }
+.slot.full .cnt { color: var(--pink); }
+.slot .block {
+  border: 2px solid #cdeaf8;
+  background: transparent;
+  color: #6aa9c9;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.slot .block:hover { border-color: var(--red); color: var(--red); }
+.slot.blocked .block { border-color: var(--green); color: var(--green); }
+.bkg { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.bk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  background: #eef8fd;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-deep);
+}
+.bk.cancelled { opacity: .55; text-decoration: line-through; }
+.bk .tag {
+  font-weight: 800;
+  font-size: 10px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: var(--white);
+}
+.bk .tag.pickup { background: var(--sky-deep); }
+.bk .tag.delivery { background: var(--pink); }
+.bk .rc { font-size: 10.5px; color: #6aa9c9; font-weight: 700; }
+.bk a { color: var(--sky-deep); text-decoration: none; font-weight: 700; }
+.msg { text-align: center; font-weight: 700; padding: 18px 0; color: var(--ink); }
+.msg.err { color: var(--red); }
+.legend { font-size: 11px; font-weight: 700; color: #6aa9c9; margin-top: 10px; text-align: center; }
+footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: .12em; opacity: .9; padding-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Laundry+ Admin</h1>
+    <p>Pickup &amp; Delivery Slot Schedule</p>
+  </header>
+
+  <div class="card" id="keyCard">
+    <label class="lbl" for="key">Admin Key</label>
+    <div class="keyrow">
+      <input type="password" id="key" placeholder="Enter admin key" autocomplete="current-password">
+      <button class="btn" id="saveKey">Save</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="datebar">
+      <button class="nav" id="prevDay" aria-label="Previous day">‹</button>
+      <div class="cur">
+        <div class="d" id="curDate"></div>
+        <div class="sub" id="curHours"></div>
+      </div>
+      <button class="nav" id="nextDay" aria-label="Next day">›</button>
+      <button class="btn today" id="todayBtn">Today</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="slots" id="slots"><div class="msg">Enter your admin key to load the schedule.</div></div>
+    <div class="legend">Tap BLOCK to close a slot for new bookings (shows as FULL on the form) · UNBLOCK reopens it. Cancelled orders don't count toward the cap.</div>
+  </div>
+
+  <footer>LAUNDRY+ ・ ADMIN</footer>
+</div>
+
+<script>
+// Must match GAS_ENDPOINT in index.html (same Apps Script web app)
+const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwngDiaWySIxwaZ6Uktgwg10rAWscajSLIpUFVG-7tHdHz8yYHhGArudp8ZXDs9U49q/exec";
+
+const pad = n => String(n).padStart(2, "0");
+const toISODate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmtHour = h => `${((h + 11) % 12) + 1}:00 ${h >= 12 ? "PM" : "AM"}`;
+const fmtDate = d => d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+// same rider hours as the booking form
+const slotHours = d => (d.getDay() === 0 || d.getDay() === 6)
+  ? { start: 9, end: 19 }   // weekend: 9AM–7PM
+  : { start: 8, end: 21 };  // weekday: 8AM–9PM
+
+const keyInput = document.getElementById("key");
+const slotsEl = document.getElementById("slots");
+let curDate = new Date();
+curDate.setHours(0, 0, 0, 0);
+let busy = false;
+
+keyInput.value = localStorage.getItem("lpAdminKey") || "";
+document.getElementById("saveKey").addEventListener("click", () => {
+  localStorage.setItem("lpAdminKey", keyInput.value.trim());
+  load();
+});
+keyInput.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("saveKey").click(); });
+document.getElementById("prevDay").addEventListener("click", () => { curDate.setDate(curDate.getDate() - 1); load(); });
+document.getElementById("nextDay").addEventListener("click", () => { curDate.setDate(curDate.getDate() + 1); load(); });
+document.getElementById("todayBtn").addEventListener("click", () => { curDate = new Date(); curDate.setHours(0,0,0,0); load(); });
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderHeader() {
+  document.getElementById("curDate").textContent = fmtDate(curDate);
+  const { start, end } = slotHours(curDate);
+  document.getElementById("curHours").textContent = `Rider hours: ${fmtHour(start)} – ${fmtHour(end)}`;
+}
+
+async function load() {
+  renderHeader();
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) {
+    slotsEl.innerHTML = `<div class="msg">Enter your admin key to load the schedule.</div>`;
+    return;
+  }
+  slotsEl.innerHTML = `<div class="msg">Loading…</div>`;
+  const date = toISODate(curDate);
+  let data;
+  try {
+    const res = await fetch(`${GAS_ENDPOINT}?action=day&date=${date}&key=${encodeURIComponent(key)}`);
+    data = await res.json();
+  } catch (err) {
+    slotsEl.innerHTML = `<div class="msg err">Couldn't reach the server. Check your connection and try again.</div>`;
+    return;
+  }
+  if (!data.ok) {
+    slotsEl.innerHTML = `<div class="msg err">Wrong admin key. Check the key and press Save.</div>`;
+    return;
+  }
+  if (date !== toISODate(curDate)) return; // user already navigated away
+
+  const { start, end } = slotHours(curDate);
+  const cap = data.cap || 2;
+  let html = "";
+  for (let h = start; h < end; h++) {
+    const slot = pad(h) + ":00";
+    const bks = (data.bookings || []).filter(b => b.slot === slot);
+    const active = bks.filter(b => b.status !== "CANCELLED").length;
+    const blocked = (data.blocked || []).includes(slot);
+    const cls = blocked ? "blocked" : (active >= cap ? "full" : "");
+    html += `<div class="slot ${cls}">
+      <div class="top">
+        <span class="time">${fmtHour(h)} – ${fmtHour(h + 1)}</span>
+        <span class="cnt">${blocked ? "BLOCKED" : `${active}/${cap}${active >= cap ? " FULL" : ""}`}</span>
+        <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
+      </div>
+      ${bks.length ? `<div class="bkg">` + bks.map(b => `
+        <div class="bk ${b.status === "CANCELLED" ? "cancelled" : ""}">
+          <span class="tag ${b.type}">${b.type === "pickup" ? "PICKUP" : "DELIVERY"}</span>
+          <span>${esc(b.name)}</span>
+          <a href="tel:${esc(b.phone)}">${esc(b.phone)}</a>
+          <span class="rc">${esc(b.receipt)} · ${esc(b.speed)} · ${esc(b.status)}</span>
+        </div>`).join("") + `</div>` : ""}
+    </div>`;
+  }
+  slotsEl.innerHTML = html || `<div class="msg">No slots on this day.</div>`;
+}
+
+slotsEl.addEventListener("click", async e => {
+  const btn = e.target.closest(".block");
+  if (!btn || busy) return;
+  busy = true;
+  btn.textContent = "…";
+  try {
+    const res = await fetch(GAS_ENDPOINT, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "block",
+        key: localStorage.getItem("lpAdminKey"),
+        date: toISODate(curDate),
+        slot: btn.dataset.slot,
+        blocked: btn.dataset.blocked !== "1",
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong.");
+  } catch (err) {
+    alert("Couldn't reach the server. Please try again.");
+  } finally {
+    busy = false;
+    load();
+  }
+});
+
+load();
+</script>
+</body>
+</html>
