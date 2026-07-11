@@ -561,11 +561,11 @@ footer {
       <div class="row">
         <div class="field">
           <label class="lbl" for="name">Name<span class="req">*</span></label>
-          <input type="text" id="name" name="name" placeholder="Juan dela Cruz" required autocomplete="name">
+          <input type="text" id="name" name="name" placeholder="Juan dela Cruz" required autocomplete="name" data-err="Please enter your name.">
         </div>
         <div class="field">
           <label class="lbl" for="phone">Mobile No.<span class="req">*</span></label>
-          <input type="tel" id="phone" name="phone" placeholder="0917 123 4567" required autocomplete="tel">
+          <input type="tel" id="phone" name="phone" placeholder="0917 123 4567" required autocomplete="tel" data-err="Please enter your mobile number.">
         </div>
       </div>
     </section>
@@ -787,6 +787,12 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
 });
 
 document.getElementById("againBtn").addEventListener("click", () => location.reload());
+
+// Force English validation messages regardless of the browser's language
+document.querySelectorAll("#orderForm [required]").forEach(el => {
+  el.addEventListener("invalid", () => el.setCustomValidity(el.dataset.err || "Please fill out this field."));
+  el.addEventListener("input", () => el.setCustomValidity(""));
+});
 
 // first row
 addLoadRow(0);
