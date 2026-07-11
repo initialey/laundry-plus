@@ -36,30 +36,18 @@ python3 -m http.server 8787
 - `BANGO` — 香りレベル
 - `SPEEDS` — 仕上がりスピードと追加料金(fee)
 
-## Google Apps Script(GAS)連携 ※今後の予定
+## Google Apps Script(GAS)連携
 
-送信処理は `submitToGAS(payload)` に分離済みです。現在は `GAS_ENDPOINT = ""` のためモック動作
-(送信したフリをして完了画面を出す)になっています。連携手順:
+送信処理は `submitToGAS(payload)` に分離されており、`GAS_ENDPOINT` にウェブアプリURLを
+設定すると本番動作になります(空文字ならモック動作)。セットアップ手順:
 
 1. Googleスプレッドシートを作成 → 拡張機能 → Apps Script
-2. 以下のような `doPost` を作成:
-
-   ```js
-   function doPost(e) {
-     const data = JSON.parse(e.postData.contents);
-     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
-     sheet.appendRow([
-       data.receiptNo, data.receivedAt, data.name, data.phone,
-       JSON.stringify(data.loads), data.bango, data.speed,
-       data.notes, data.total,
-     ]);
-     return ContentService.createTextOutput(JSON.stringify({ ok: true }))
-       .setMimeType(ContentService.MimeType.JSON);
-   }
-   ```
-
+2. [`gas/Code.gs`](gas/Code.gs) の中身を貼り付けて保存
 3. デプロイ → 新しいデプロイ → 種類「ウェブアプリ」→ アクセス「全員」でデプロイ
 4. 発行されたウェブアプリURLを `index.html` の `GAS_ENDPOINT` に貼り付け
+
+コードを修正したときは「デプロイ → デプロイを管理 → ✏️編集 → バージョン: 新バージョン → デプロイ」
+で**URLを変えずに**更新できます。
 
 payload の形:
 
@@ -69,6 +57,7 @@ payload の形:
   "receivedAt": "2026-07-11T06:04:29.000Z",
   "name": "Juan dela Cruz",
   "phone": "0917 123 4567",
+  "address": "123 Sample St., Brgy. Uno, Quezon City",
   "loads": [{ "type": "assorted", "label": "Assorted Clothes (up to 7kg)", "kg": 7, "amount": 240 }],
   "bango": "normal",
   "speed": "24hrs",

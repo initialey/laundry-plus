@@ -1,7 +1,8 @@
-// Laundry+ 注文受付 GAS
-// スプレッドシートの「拡張機能 → Apps Script」にこのファイルの中身を貼り付けて、
-// 「デプロイ → 新しいデプロイ → ウェブアプリ(アクセス: 全員)」でデプロイする。
-// 発行されたウェブアプリURLを index.html の GAS_ENDPOINT に設定する。
+// Laundry+ order intake GAS
+// Paste this into the spreadsheet's "Extensions → Apps Script", then deploy as a
+// web app (access: Anyone). Put the web app URL into GAS_ENDPOINT in index.html.
+// To update an existing deployment WITHOUT changing its URL:
+// Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
 
 const SHEET_NAME = "Orders";
 
@@ -12,12 +13,15 @@ function doPost(e) {
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
 
-  // シートが空なら1行目に見出しを書く
+  // Write the header row if the sheet is empty
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["受付番号", "受付日時", "名前", "電話", "注文内容", "香り", "スピード", "メモ", "合計(PHP)"]);
+    sheet.appendRow([
+      "Receipt No", "Received At", "Name", "Phone", "Address",
+      "Loads", "Bango", "Speed", "Notes", "Total (PHP)",
+    ]);
   }
 
-  // 注文内容(loads)を読みやすいテキストにする
+  // Human-readable summary of the loads
   const loadsText = (data.loads || [])
     .map(function (l) { return l.label + " " + l.kg + "kg = P" + l.amount; })
     .join("\n");
@@ -26,7 +30,8 @@ function doPost(e) {
     data.receiptNo,
     new Date(data.receivedAt),
     data.name,
-    "'" + data.phone, // 先頭の0が消えないように文字列として保存
+    "'" + data.phone, // keep leading zero by storing as text
+    data.address,
     loadsText,
     data.bango,
     data.speed,

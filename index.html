@@ -567,6 +567,10 @@ footer {
           <label class="lbl" for="phone">Mobile No.<span class="req">*</span></label>
           <input type="tel" id="phone" name="phone" placeholder="0917 123 4567" required autocomplete="tel" data-err="Please enter your mobile number.">
         </div>
+        <div class="field" style="flex-basis: 100%;">
+          <label class="lbl" for="address">Address<span class="req">*</span></label>
+          <input type="text" id="address" name="address" placeholder="House No., Street, Barangay, City" required autocomplete="street-address" data-err="Please enter your address.">
+        </div>
       </div>
     </section>
 
@@ -763,6 +767,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     receivedAt: now.toISOString(),
     name: form.name.value.trim(),
     phone: form.phone.value.trim(),
+    address: form.address.value.trim(),
     loads,
     bango: document.querySelector("input[name=bango]:checked").value,
     speed: speed.value,
