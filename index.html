@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laundry+ | Wash + Dry + Fold — Drop-off Form</title>
+<title>Laundry+ | Wash + Dry + Fold — Book for Pickup</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +41,15 @@ body {
   max-width: 560px;
   margin: 0 auto;
   padding: 0 20px 60px;
+}
+/* clip the decorative layer so off-screen clouds never create
+   phantom scroll space on real phones */
+.bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
 }
 .cloud {
   position: absolute;
@@ -313,7 +322,7 @@ select {
 .add-load:hover { background: #eef8fd; border-color: var(--sky); }
 
 /* ── bango chips ── */
-.bango { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bango { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; }
 .chip { position: relative; }
 .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .chip > span {
@@ -340,6 +349,7 @@ select {
   color: var(--pink);
   text-shadow: 0 1px 0 rgba(240,111,168,.25);
 }
+.chip .flowers i.none { color: #9ed6f0; text-shadow: none; }
 .chip small { font-weight: 700; font-size: 9.5px; color: #6aa9c9; display: block; }
 .chip input:checked + span {
   border-color: var(--pink);
@@ -348,6 +358,40 @@ select {
   box-shadow: 0 3px 0 rgba(240,111,168,.3);
 }
 .chip input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
+
+/* ── add-ons & preference checks ── */
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.checks + .checks { margin-top: 10px; }
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 2px solid #cdeaf8;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13.5px;
+  color: var(--ink-deep);
+  transition: all .15s;
+  user-select: none;
+}
+.check input {
+  width: 18px; height: 18px;
+  margin-top: 1px;
+  accent-color: var(--pink);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.check small { display: block; font-size: 10.5px; font-weight: 700; color: #6aa9c9; }
+.check .fee2 {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--sky-deep);
+  white-space: nowrap;
+}
+.check:has(input:checked) { border-color: var(--pink); background: #fdf1f7; }
 
 /* ── speed options ── */
 .speeds { display: flex; flex-direction: column; gap: 8px; }
@@ -506,7 +550,9 @@ footer {
   font-size: 11.5px;
   letter-spacing: .12em;
   opacity: .9;
+  line-height: 1.9;
 }
+footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 @media (max-width: 640px) {
   /* tuck the clouds into the corners: still visible, never behind the text */
   .cloud.tl { top: -105px; left: -125px; }
@@ -535,7 +581,8 @@ footer {
 </head>
 <body>
 
-<!-- clouds -->
+<!-- clouds (clipped wrapper so decorations never extend the scrollable area) -->
+<div class="bg" aria-hidden="true">
 <div class="cloud tl">
   <i style="width:180px;height:180px;left:0;top:0"></i>
   <i style="width:120px;height:120px;left:140px;top:40px"></i>
@@ -565,6 +612,7 @@ footer {
   <i class="lite" style="width:18px;height:18px;left:7%;top:84%"></i>
   <i style="width:8px;height:8px;left:14%;top:93%"></i>
   <i class="lite" style="width:13px;height:13px;left:86%;top:92%"></i>
+</div>
 </div>
 
 <div class="scene">
@@ -605,7 +653,7 @@ footer {
       <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
     </div>
     <div class="prow">
-      <div class="pl">Blankets/Jeans/Towels <small>(Max 5kg)</small></div>
+      <div class="pl">Blankets/Jeans/Towels <small>(per 5kg load)</small></div>
       <div class="pr"><span class="num sm">240</span><span class="per">PHP/Load</span></div>
     </div>
     <div class="sulit">
@@ -631,6 +679,18 @@ footer {
           <label class="lbl" for="address">Address<span class="req">*</span></label>
           <input type="text" id="address" name="address" placeholder="House No., Street, Barangay, City" required autocomplete="street-address" data-err="Please enter your address.">
         </div>
+        <div class="field">
+          <label class="lbl" for="fb">Facebook (Name or Link)</label>
+          <input type="text" id="fb" name="fb" placeholder="facebook.com/yourname" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="lbl" for="contactvia">Best Way to Contact You</label>
+          <select id="contactvia" name="contactvia">
+            <option value="Text / SMS" selected>Text / SMS</option>
+            <option value="Call">Call</option>
+            <option value="Facebook Messenger">Facebook Messenger</option>
+          </select>
+        </div>
       </div>
     </section>
 
@@ -647,18 +707,61 @@ footer {
     </section>
 
     <section class="card">
-      <h2><span class="step">4</span>Need It Faster?</h2>
+      <h2><span class="step">4</span>Add-ons &amp; Preferences</h2>
+      <div class="checks" id="addons"></div>
+      <div class="checks">
+        <label class="check">
+          <input type="checkbox" name="pref" value="Separate whites &amp; colors">
+          <span>Do you prefer your whites and colors separated?<small>Additional charges will apply — confirmed at the shop.</small></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="pref" value="Has delicate / hand-wash items">
+          <span>Any delicate or hand-wash items?</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="pref" value="Items may bleed color">
+          <span>Any items that may bleed color?</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">5</span>Need It Faster?</h2>
       <div class="speeds" id="speeds"></div>
     </section>
 
     <section class="card">
-      <h2><span class="step">5</span>Notes</h2>
+      <h2><span class="step">6</span>Pickup &amp; Delivery Schedule</h2>
+      <div class="row">
+        <div class="field">
+          <label class="lbl" for="pickupDate">Preferred Pickup Date<span class="req">*</span></label>
+          <input type="date" id="pickupDate" name="pickupDate" required data-err="Please choose your pickup date.">
+        </div>
+        <div class="field">
+          <label class="lbl" for="pickupTime">Pickup Time<span class="req">*</span></label>
+          <select id="pickupTime" name="pickupTime" required data-err="Please choose a pickup time slot."></select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="deliveryDate">Preferred Delivery Date<span class="req">*</span></label>
+          <input type="date" id="deliveryDate" name="deliveryDate" required data-err="Please choose your delivery date.">
+        </div>
+        <div class="field">
+          <label class="lbl" for="deliveryTime">Delivery Time<span class="req">*</span></label>
+          <select id="deliveryTime" name="deliveryTime" required data-err="Please choose a delivery time slot."></select>
+        </div>
+      </div>
+      <p class="hint">Pickup &amp; delivery hours — Weekdays: 8AM–9PM · Weekends: 9AM–7PM. Slots are limited per hour; full slots show as FULL.</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">7</span>Notes</h2>
       <textarea id="notes" name="notes" placeholder="Stains, delicate items, special instructions…"></textarea>
     </section>
 
     <div class="totalcard">
       <div class="line"><span>Loads subtotal</span><span id="subLoads">₱0</span></div>
       <div class="line"><span>Speed surcharge</span><span id="subSpeed">₱0</span></div>
+      <div class="line"><span>Add-ons</span><span id="subAddons">₱0</span></div>
       <div class="grand">
         <span class="t">TOTAL</span>
         <span class="v"><small>₱</small><span id="grandTotal">0</span></span>
@@ -666,7 +769,7 @@ footer {
       <div class="estnote">⚠️ All prices shown are <b>estimates only</b>. Your final price is determined at the shop after your laundry arrives and is weighed.</div>
     </div>
 
-    <button type="submit" class="submit" id="submitBtn">Drop It Off! 🧺</button>
+    <button type="submit" class="submit" id="submitBtn">Book for Pickup 🧺</button>
     <p class="note">* Prices are estimates. Final amount is confirmed after weighing in-store.</p>
   </form>
 
@@ -678,21 +781,22 @@ footer {
       </svg>
     </div>
     <h2>All Set!</h2>
-    <p>Your laundry order is in.<br>Show this claim number when you pick up your fresh clothes.</p>
+    <p>Your pickup is booked!<br>We'll collect your laundry on <b id="doneWhen"></b>.<br>Keep this claim number handy.</p>
     <div class="rcpt" id="rcptNo"></div>
     <button type="button" class="again" id="againBtn">New Order</button>
   </div>
 </main>
 </div>
 
-<footer>LAUNDRY+ ・ OPEN DAILY 8AM–8PM</footer>
+<footer>LAUNDRY+ ・ OPEN DAILY 5AM–11PM<br>
+<span class="fsub">PICKUP &amp; DELIVERY — WEEKDAYS 8AM–9PM ・ WEEKENDS 9AM–7PM</span></footer>
 
 <script>
 // ===== Pricing master (sync with GAS sheet later) =====
 // model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
   { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, unit: "kg", step: 0.5, max: 20, def: 7, tag: "₱240/load up to 7kg, +₱45/kg" },
-  { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, unit: "kg", step: 0.5, max: 5,  def: 5, tag: "₱240/load, max 5kg" },
+  { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 per 5kg load" },
   { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
   { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱150/load, max 7kg" },
   { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱150/load, max 7kg" },
@@ -706,6 +810,7 @@ const LOAD_TYPES = [
   { group: "Press Only",         id: "hanger",      label: "Hanger w/ Dust Bag",                model: "rate", rate: 20,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱20/pc" },
 ];
 const BANGO = [
+  { id: "none",   label: "None",   flowers: 0, note: "No scent" },
   { id: "less",   label: "Less",   flowers: 1 },
   { id: "normal", label: "Normal", flowers: 2, note: "Recommended" },
   { id: "extra",  label: "Extra",  flowers: 3 },
@@ -717,6 +822,9 @@ const SPEEDS = [
   { id: "rush",      label: "Rush (Same Day)",   note: "Cut-off time: 12NN",           fee: 150 },
   { id: "superrush", label: "Super Rush (5hrs)", note: "Cut-off time: 2PM",            fee: 200 },
 ];
+const ADDONS = [
+  { id: "bleach", label: "Bleach", fee: 20 }, // fee is per load
+];
 
 const php = n => "₱" + n.toLocaleString("en-PH");
 const flowerSVG = `<i aria-hidden="true">✿</i>`;
@@ -725,8 +833,16 @@ const flowerSVG = `<i aria-hidden="true">✿</i>`;
 document.getElementById("bango").innerHTML = BANGO.map(b => `
   <label class="chip">
     <input type="radio" name="bango" value="${b.id}" ${b.id === "normal" ? "checked" : ""}>
-    <span><span class="flowers">${flowerSVG.repeat(b.flowers)}</span>${b.label}${b.note ? `<small>${b.note}</small>` : "<small>&nbsp;</small>"}</span>
+    <span><span class="flowers">${b.flowers ? flowerSVG.repeat(b.flowers) : `<i class="none" aria-hidden="true">—</i>`}</span>${b.label}${b.note ? `<small>${b.note}</small>` : "<small>&nbsp;</small>"}</span>
   </label>`).join("");
+
+document.getElementById("addons").innerHTML = ADDONS.map(a => `
+  <label class="check">
+    <input type="checkbox" name="addon" value="${a.id}" data-fee="${a.fee}">
+    <span>${a.label}</span>
+    <span class="fee2">+₱${a.fee}/load</span>
+  </label>`).join("");
+document.getElementById("addons").addEventListener("change", updateTotals);
 
 document.getElementById("speeds").innerHTML = SPEEDS.map(s => `
   <label class="speed">
@@ -790,6 +906,8 @@ document.getElementById("speeds").addEventListener("change", updateTotals);
 
 function loadPrice(t, qty) {
   if (t.model === "rate") return Math.round(t.rate * qty);
+  // every started block of loadKg counts as another full load (e.g. towels: 6kg = 2 loads)
+  if (t.loadKg) return t.base * Math.ceil(qty / t.loadKg);
   let price = t.base;
   if (t.extraPerKg && qty > t.includedKg) price += Math.ceil(qty - t.includedKg) * t.extraPerKg;
   return price;
@@ -802,23 +920,102 @@ function collectLoads() {
     return { type: t.id, label: t.label, qty, unit: t.unit, amount: loadPrice(t, qty) };
   });
 }
-function updateTotals() {
+function computeTotals() {
   const loads = collectLoads();
   const fee = +document.querySelector("input[name=speed]:checked").dataset.fee;
+  const addonFee = [...document.querySelectorAll("input[name=addon]:checked")]
+    .reduce((s, a) => s + +a.dataset.fee, 0);
   const subLoads = loads.reduce((s, l) => s + l.amount, 0);
   const subSpeed = fee * loads.length;
+  const subAddons = addonFee * loads.length;
+  return { loads, subLoads, subSpeed, subAddons, total: subLoads + subSpeed + subAddons };
+}
+function updateTotals() {
+  const { loads, subLoads, subSpeed, subAddons, total } = computeTotals();
   [...loadsEl.querySelectorAll(".load")].forEach((row, i) => {
     row.querySelector(".amt").textContent = php(loads[i].amount);
   });
   document.getElementById("subLoads").textContent = php(subLoads);
   document.getElementById("subSpeed").textContent = php(subSpeed);
-  document.getElementById("grandTotal").textContent = (subLoads + subSpeed).toLocaleString("en-PH");
+  document.getElementById("subAddons").textContent = php(subAddons);
+  document.getElementById("grandTotal").textContent = total.toLocaleString("en-PH");
 }
 
 // ===== Claim number =====
 const now = new Date();
 const pad = n => String(n).padStart(2, "0");
 const rcpt = `LP-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+// ===== Pickup & delivery time slots =====
+// Rider hours (the shop itself is open 5AM–11PM):
+// weekdays 8AM–9PM, weekends 9AM–7PM. Slot counts per hour are capped
+// server-side (SLOT_CAP in gas/Code.gs); full slots come back disabled.
+const slotHours = d => (d.getDay() === 0 || d.getDay() === 6)
+  ? { start: 9, end: 19 }   // weekend: 9AM–7PM
+  : { start: 8, end: 21 };  // weekday: 8AM–9PM
+const toISODate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmtHour = h => `${((h + 11) % 12) + 1}:00 ${h >= 12 ? "PM" : "AM"}`;
+
+const pickupDate = document.getElementById("pickupDate");
+const pickupTime = document.getElementById("pickupTime");
+const deliveryDate = document.getElementById("deliveryDate");
+const deliveryTime = document.getElementById("deliveryTime");
+
+async function fetchSlotCounts(date) {
+  if (!GAS_ENDPOINT) return null;
+  try {
+    const res = await fetch(`${GAS_ENDPOINT}?action=slots&date=${date}`);
+    return await res.json(); // { cap, counts: { "08:00": n, ... } }
+  } catch (err) {
+    console.warn("slot check failed, showing all slots", err);
+    return null; // if the check fails, show all slots — the shop confirms anyway
+  }
+}
+
+async function refreshSlots(dateInput, timeSelect) {
+  if (!dateInput.value) {
+    timeSelect.innerHTML = `<option value="" selected disabled>Choose a date first</option>`;
+    return;
+  }
+  const prev = timeSelect.value;
+  timeSelect.innerHTML = `<option value="" selected disabled>Checking slots…</option>`;
+  const d = new Date(dateInput.value + "T00:00:00");
+  const { start, end } = slotHours(d);
+  const today = new Date();
+  const isToday = dateInput.value === toISODate(today);
+  const avail = await fetchSlotCounts(dateInput.value);
+  let html = `<option value="" disabled>Choose a time slot</option>`;
+  let anyOpen = false, keptPrev = false;
+  for (let h = start; h < end; h++) {
+    if (isToday && h <= today.getHours()) continue; // needs at least an hour's notice
+    const v = pad(h) + ":00";
+    const full = !!(avail && avail.counts && avail.counts[v] >= (avail.cap || 99));
+    const sel = prev === v && !full;
+    if (sel) keptPrev = true;
+    if (!full) anyOpen = true;
+    html += `<option value="${v}" ${full ? "disabled" : ""}${sel ? " selected" : ""}>${fmtHour(h)} – ${fmtHour(h + 1)}${full ? " — FULL" : ""}</option>`;
+  }
+  if (!anyOpen) html = `<option value="" selected disabled>No slots left — pick another date</option>`;
+  timeSelect.innerHTML = html;
+  if (!keptPrev) timeSelect.value = "";
+}
+
+const todayISO = toISODate(now);
+pickupDate.min = todayISO;
+deliveryDate.min = todayISO;
+pickupDate.addEventListener("change", () => {
+  refreshSlots(pickupDate, pickupTime);
+  if (pickupDate.value) {
+    deliveryDate.min = pickupDate.value; // delivery can't be before pickup
+    if (deliveryDate.value && deliveryDate.value < pickupDate.value) {
+      deliveryDate.value = "";
+      refreshSlots(deliveryDate, deliveryTime);
+    }
+  }
+});
+deliveryDate.addEventListener("change", () => refreshSlots(deliveryDate, deliveryTime));
+refreshSlots(pickupDate, pickupTime);
+refreshSlots(deliveryDate, deliveryTime);
 
 // ===== Submit (static mock: swap in GAS endpoint later) =====
 const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwngDiaWySIxwaZ6Uktgwg10rAWscajSLIpUFVG-7tHdHz8yYHhGArudp8ZXDs9U49q/exec";
@@ -839,26 +1036,42 @@ async function submitToGAS(payload) {
 document.getElementById("orderForm").addEventListener("submit", async e => {
   e.preventDefault();
   const form = e.target;
+  // Messenger only works if we have their Facebook
+  if (form.contactvia.value === "Facebook Messenger" && !form.fb.value.trim()) {
+    form.fb.setCustomValidity("Please add your Facebook name or link so we can reach you on Messenger.");
+  } else {
+    form.fb.setCustomValidity("");
+  }
   if (!form.reportValidity()) return;
 
   const btn = document.getElementById("submitBtn");
   btn.disabled = true;
   btn.textContent = "Sending…";
 
-  const loads = collectLoads();
   const speed = document.querySelector("input[name=speed]:checked");
-  const fee = +speed.dataset.fee;
+  const { loads, total } = computeTotals();
+  const addons = [...document.querySelectorAll("input[name=addon]:checked")].map(el => {
+    const a = ADDONS.find(x => x.id === el.value);
+    return `${a.label} (+₱${a.fee}/load)`;
+  });
+  const prefs = [...document.querySelectorAll("input[name=pref]:checked")].map(el => el.value);
   const payload = {
     receiptNo: rcpt,
     receivedAt: now.toISOString(),
     name: form.name.value.trim(),
     phone: form.phone.value.trim(),
+    fb: form.fb.value.trim(),
+    contactVia: form.contactvia.value,
     address: form.address.value.trim(),
+    pickup: `${pickupDate.value} ${pickupTime.value}`,
+    delivery: `${deliveryDate.value} ${deliveryTime.value}`,
     loads,
     bango: document.querySelector("input[name=bango]:checked").value,
+    addons,
+    prefs,
     speed: speed.value,
     notes: form.notes.value.trim(),
-    total: loads.reduce((s, l) => s + l.amount, 0) + fee * loads.length,
+    total,
   };
 
   try {
@@ -866,6 +1079,8 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     form.style.display = "none";
     document.querySelector(".pricebar").style.display = "none";
     document.getElementById("rcptNo").textContent = rcpt;
+    document.getElementById("doneWhen").textContent =
+      `${pickupDate.value}, ${pickupTime.options[pickupTime.selectedIndex].text}`;
     document.getElementById("done").classList.add("show");
     window.scrollTo({ top: 0 });
   } catch (err) {
@@ -873,7 +1088,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     console.error(err);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Drop It Off! 🧺";
+    btn.textContent = "Book for Pickup 🧺";
   }
 });
 
@@ -884,6 +1099,7 @@ document.querySelectorAll("#orderForm [required]").forEach(el => {
   el.addEventListener("invalid", () => el.setCustomValidity(el.dataset.err || "Please fill out this field."));
   el.addEventListener("input", () => el.setCustomValidity(""));
 });
+document.getElementById("fb").addEventListener("input", e => e.target.setCustomValidity(""));
 
 // first row
 addLoadRow(0);
