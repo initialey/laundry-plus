@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laundry+ | Wash + Dry + Fold — Drop-off Form</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sky: #3fb4e6;
+  --sky-deep: #1e9ad2;
+  --sky-dot: #1b7fb5;
+  --white: #ffffff;
+  --ink: #1d7db3;      /* blue text on white cards */
+  --ink-deep: #14618d;
+  --yellow: #ffd23f;
+  --yellow-deep: #f5b820;
+  --pink: #f06fa8;
+  --pink-soft: #f8a8cb;
+  --display: "Baloo 2", cursive;
+  --body: "Nunito", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--body);
+  background: var(--sky);
+  color: var(--white);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── clouds & bubbles backdrop ── */
+.scene {
+  position: relative;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 20px 60px;
+}
+.cloud {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+.cloud i {
+  position: absolute;
+  background: var(--white);
+  border-radius: 50%;
+}
+.cloud.tl { top: -70px; left: -80px; }
+.cloud.tr { top: -90px; right: -70px; }
+.cloud.bl { bottom: -90px; left: -70px; }
+.cloud.br { bottom: -70px; right: -90px; }
+.dots { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.dots i {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--sky-dot);
+  opacity: .55;
+}
+.dots i.lite { background: #bfe9fb; opacity: .9; }
+main { position: relative; z-index: 1; }
+
+/* ── header / logo ── */
+header { text-align: center; padding: 44px 0 8px; }
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(44px, 11vw, 60px);
+  line-height: 1;
+  letter-spacing: .01em;
+}
+.logo .plus {
+  font-size: .55em;
+  vertical-align: super;
+  position: relative;
+  top: -.55em;
+  margin-left: 2px;
+}
+.logo svg { width: .82em; height: .82em; }
+.tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 6px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(20px, 5.5vw, 27px);
+}
+.tag::before, .tag::after {
+  content: "";
+  width: 36px; height: 3px;
+  background: var(--white);
+  border-radius: 2px;
+}
+.freebie {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  background: var(--white);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 7px 18px;
+  border-radius: 999px;
+  box-shadow: 0 3px 0 rgba(20, 97, 141, .25);
+}
+.freebie b { color: var(--sky-deep); }
+.ready {
+  margin-top: 16px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--yellow);
+  letter-spacing: .04em;
+}
+.ready b { font-size: 19px; }
+
+/* ── price banner ── */
+.pricebar {
+  margin-top: 22px;
+  text-align: center;
+}
+.pricebar .lead {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+}
+.pricebar .big {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(56px, 15vw, 76px);
+  line-height: 1;
+}
+.pricebar .big small { font-size: .38em; font-weight: 700; }
+.pricebar .subrates {
+  margin-top: 6px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  opacity: .95;
+}
+.sulit {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  border: 2px solid var(--yellow);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.sulit .thumb {
+  flex-shrink: 0;
+  background: var(--yellow);
+  color: var(--ink-deep);
+  font-weight: 800;
+  font-size: 10px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: center;
+}
+.sulit .thumb span { display: block; font-size: 18px; }
+.sulit b { color: var(--yellow); }
+
+/* ── form cards ── */
+form { margin-top: 30px; display: flex; flex-direction: column; gap: 18px; }
+.card {
+  background: var(--white);
+  color: var(--ink-deep);
+  border-radius: 22px;
+  padding: 20px 20px 22px;
+  box-shadow: 0 5px 0 rgba(20, 97, 141, .28);
+}
+.card h2 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--sky-deep);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card h2 .step {
+  background: var(--sky);
+  color: var(--white);
+  font-size: 13px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  flex-shrink: 0;
+}
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.field { flex: 1 1 180px; }
+label.lbl {
+  display: block;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+label.lbl .req { color: var(--pink); margin-left: 3px; }
+input[type=text], input[type=tel], input[type=number], input[type=date], select, textarea {
+  width: 100%;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink-deep);
+  background: #eef8fd;
+  border: 2px solid #cdeaf8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(63,180,230,.25);
+}
+textarea { resize: vertical; min-height: 64px; }
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--sky-deep) 50%), linear-gradient(135deg, var(--sky-deep) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 12px) 55%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+/* ── load rows ── */
+.loads { display: flex; flex-direction: column; gap: 10px; }
+.load {
+  display: grid;
+  grid-template-columns: 1fr 86px 74px 30px;
+  gap: 8px;
+  align-items: center;
+}
+.load .kg { position: relative; }
+.load .kg::after {
+  content: "kg";
+  position: absolute;
+  right: 10px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sky-deep);
+  pointer-events: none;
+}
+.load .kg input { padding-right: 30px; -moz-appearance: textfield; }
+.load .kg input::-webkit-outer-spin-button, .load .kg input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.load .amt {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 15px;
+  text-align: right;
+  color: var(--sky-deep);
+  white-space: nowrap;
+}
+.load .del {
+  width: 30px; height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef8fd;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1;
+}
+.load .del:hover { background: var(--pink-soft); color: var(--white); }
+.hint { margin-top: 8px; font-size: 11.5px; font-weight: 700; color: #6aa9c9; }
+.add-load {
+  margin-top: 10px;
+  width: 100%;
+  padding: 11px;
+  background: transparent;
+  border: 2px dashed #9ed6f0;
+  border-radius: 12px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sky-deep);
+  cursor: pointer;
+  transition: all .15s;
+}
+.add-load:hover { background: #eef8fd; border-color: var(--sky); }
+
+/* ── bango chips ── */
+.bango { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 8px;
+  border: 2px solid #cdeaf8;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+  text-align: center;
+}
+.chip .flowers { display: flex; gap: 2px; height: 18px; align-items: center; }
+.chip .flowers i {
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--pink);
+  text-shadow: 0 1px 0 rgba(240,111,168,.25);
+}
+.chip small { font-weight: 700; font-size: 9.5px; color: #6aa9c9; display: block; }
+.chip input:checked + span {
+  border-color: var(--pink);
+  background: #fdf1f7;
+  color: var(--pink);
+  box-shadow: 0 3px 0 rgba(240,111,168,.3);
+}
+.chip input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
+
+/* ── speed options ── */
+.speeds { display: flex; flex-direction: column; gap: 8px; }
+.speed { position: relative; }
+.speed input { position: absolute; opacity: 0; pointer-events: none; }
+.speed > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 2px solid #cdeaf8;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.speed .nm { font-weight: 800; font-size: 14px; }
+.speed .nm small { display: block; font-size: 10.5px; font-weight: 700; color: #6aa9c9; }
+.speed .fee {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--sky-deep);
+  white-space: nowrap;
+}
+.speed input:checked + span {
+  border-color: var(--yellow-deep);
+  background: #fff9e6;
+  box-shadow: 0 3px 0 rgba(245,184,32,.35);
+}
+.speed input:checked + span .fee { color: var(--yellow-deep); }
+.speed input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
+
+/* ── total & submit ── */
+.totalcard {
+  background: var(--white);
+  border-radius: 22px;
+  padding: 18px 20px;
+  color: var(--ink-deep);
+  box-shadow: 0 5px 0 rgba(20, 97, 141, .28);
+}
+.totalcard .line {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 2px 0;
+}
+.totalcard .grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 2px dashed #cdeaf8;
+}
+.totalcard .grand .t {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--sky-deep);
+}
+.totalcard .grand .v {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--pink);
+}
+.totalcard .grand .v small { font-size: 16px; margin-right: 2px; }
+.submit {
+  width: 100%;
+  padding: 16px;
+  background: var(--yellow);
+  color: var(--ink-deep);
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: .03em;
+  cursor: pointer;
+  box-shadow: 0 5px 0 var(--yellow-deep);
+  transition: transform .1s, box-shadow .1s;
+}
+.submit:hover { transform: translateY(-1px); }
+.submit:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--yellow-deep); }
+.submit:disabled { opacity: .6; cursor: wait; }
+.note { text-align: center; font-size: 11px; font-weight: 700; opacity: .85; }
+
+/* ── done screen ── */
+.done { display: none; text-align: center; padding: 40px 0 20px; }
+.done.show { display: block; }
+.done .badge {
+  width: 120px; height: 120px;
+  margin: 0 auto 20px;
+  background: var(--white);
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  box-shadow: 0 6px 0 rgba(20,97,141,.3);
+  animation: pop .45s cubic-bezier(.2,2,.4,1) both;
+}
+.done .badge svg { width: 64px; height: 64px; }
+@keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.done h2 { font-family: var(--display); font-weight: 800; font-size: 32px; }
+.done p { margin-top: 6px; font-weight: 700; font-size: 14px; line-height: 1.7; }
+.done .rcpt {
+  display: inline-block;
+  margin-top: 16px;
+  background: var(--white);
+  color: var(--ink-deep);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: .04em;
+  padding: 10px 24px;
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgba(20,97,141,.3);
+}
+.done .again {
+  display: block;
+  margin: 26px auto 0;
+  background: transparent;
+  border: 2px solid var(--white);
+  color: var(--white);
+  padding: 10px 28px;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.done .again:hover { background: var(--white); color: var(--sky-deep); }
+
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 10px 0 30px;
+  font-weight: 800;
+  font-size: 11.5px;
+  letter-spacing: .12em;
+  opacity: .9;
+}
+@media (max-width: 440px) {
+  .load { grid-template-columns: 1fr 76px 28px; }
+  .load .amt { display: none; }
+  .bango { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- clouds -->
+<div class="cloud tl">
+  <i style="width:180px;height:180px;left:0;top:0"></i>
+  <i style="width:120px;height:120px;left:140px;top:40px"></i>
+  <i style="width:80px;height:80px;left:230px;top:20px"></i>
+</div>
+<div class="cloud tr">
+  <i style="width:200px;height:200px;right:0;top:0"></i>
+  <i style="width:110px;height:110px;right:150px;top:50px"></i>
+  <i style="width:70px;height:70px;right:240px;top:14px"></i>
+</div>
+<div class="cloud bl">
+  <i style="width:190px;height:190px;left:0;bottom:0"></i>
+  <i style="width:110px;height:110px;left:150px;bottom:8px"></i>
+</div>
+<div class="cloud br">
+  <i style="width:210px;height:210px;right:0;bottom:0"></i>
+  <i style="width:120px;height:120px;right:170px;bottom:10px"></i>
+</div>
+<div class="dots">
+  <i style="width:10px;height:10px;left:6%;top:12%"></i>
+  <i class="lite" style="width:16px;height:16px;left:12%;top:7%"></i>
+  <i style="width:7px;height:7px;left:88%;top:16%"></i>
+  <i class="lite" style="width:12px;height:12px;left:93%;top:9%"></i>
+  <i style="width:9px;height:9px;left:4%;top:55%"></i>
+  <i class="lite" style="width:14px;height:14px;left:95%;top:48%"></i>
+  <i style="width:11px;height:11px;left:91%;top:78%"></i>
+  <i class="lite" style="width:18px;height:18px;left:7%;top:84%"></i>
+  <i style="width:8px;height:8px;left:14%;top:93%"></i>
+  <i class="lite" style="width:13px;height:13px;left:86%;top:92%"></i>
+</div>
+
+<div class="scene">
+<main>
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="9"/>
+        <path d="M24 58 Q50 82 76 52 Q66 64 46 60 Q32 57 24 58 Z" fill="#fff"/>
+        <circle cx="63" cy="38" r="6" fill="#fff"/>
+      </svg>
+      <span>Laundry<span class="plus">+</span></span>
+    </div>
+    <div class="tag">Wash + Dry + Fold</div>
+    <div><span class="freebie">🧴 <b>FREE</b>&nbsp;Detergent &amp; Fabcon</span></div>
+    <div class="ready">⏱ Laundry Ready In <b>48 HRS</b></div>
+  </header>
+
+  <div class="pricebar">
+    <div class="lead">Assorted Clothes<br>Up to 7kg</div>
+    <div class="big">240 <small>PHP/load</small></div>
+    <div class="subrates">
+      ↳ Additional Weight — <b>45 PHP/kg</b><br>
+      Blankets / Jeans / Towels (max 5kg) — <b>240 PHP/load</b>
+    </div>
+    <div class="sulit">
+      <div class="thumb"><span>👍</span>SULIT!</div>
+      <div><b>Proudly Keeping Prices Fair and Reasonable.</b><br>
+      Assorted loads may include up to 2kg of bedding, jeans, or towels at no extra charge.</div>
+    </div>
+  </div>
+
+  <form id="orderForm" novalidate>
+    <section class="card">
+      <h2><span class="step">1</span>Customer Info</h2>
+      <div class="row">
+        <div class="field">
+          <label class="lbl" for="name">Name<span class="req">*</span></label>
+          <input type="text" id="name" name="name" placeholder="Juan dela Cruz" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label class="lbl" for="phone">Mobile No.<span class="req">*</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="0917 123 4567" required autocomplete="tel">
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span>Your Loads</h2>
+      <div class="loads" id="loads"></div>
+      <button type="button" class="add-load" id="addLoad">+ Add another load</button>
+      <p class="hint">Assorted: 240 PHP up to 7kg, then +45 PHP/kg. Blankets/Jeans/Towels: max 5kg per load.</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">3</span>Choose Your Bango Level</h2>
+      <div class="bango" id="bango"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">4</span>Need It Faster?</h2>
+      <div class="speeds" id="speeds"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">5</span>Notes</h2>
+      <textarea id="notes" name="notes" placeholder="Stains, delicate items, special instructions…"></textarea>
+    </section>
+
+    <div class="totalcard">
+      <div class="line"><span>Loads subtotal</span><span id="subLoads">₱0</span></div>
+      <div class="line"><span>Speed surcharge</span><span id="subSpeed">₱0</span></div>
+      <div class="grand">
+        <span class="t">TOTAL</span>
+        <span class="v"><small>₱</small><span id="grandTotal">0</span></span>
+      </div>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn">Drop It Off! 🧺</button>
+    <p class="note">* Prices are estimates. Final amount is confirmed after weighing in-store.</p>
+  </form>
+
+  <div class="done" id="done">
+    <div class="badge">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="#3fb4e6" stroke-width="9"/>
+        <path d="M30 52 L45 66 L72 36" fill="none" stroke="#f06fa8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h2>All Set!</h2>
+    <p>Your laundry order is in.<br>Show this claim number when you pick up your fresh clothes.</p>
+    <div class="rcpt" id="rcptNo"></div>
+    <button type="button" class="again" id="againBtn">New Order</button>
+  </div>
+</main>
+</div>
+
+<footer>LAUNDRY+ ・ OPEN DAILY 8AM–8PM</footer>
+
+<script>
+// ===== Pricing master (sync with GAS sheet later) =====
+const LOAD_TYPES = [
+  { id: "assorted", label: "Assorted Clothes (up to 7kg)", base: 240, includedKg: 7, extraPerKg: 45, maxKg: 15, defaultKg: 7 },
+  { id: "blankets", label: "Blankets / Jeans / Towels",    base: 240, maxKg: 5, defaultKg: 5 },
+  { id: "washonly", label: "Wash Only",                    base: 150, maxKg: 7, defaultKg: 7 },
+  { id: "dryonly",  label: "Dry Only",                     base: 150, maxKg: 7, defaultKg: 7 },
+  { id: "foldonly", label: "Fold Only",                    base: 80,  maxKg: 7, defaultKg: 7 },
+];
+const BANGO = [
+  { id: "less",   label: "Less",   flowers: 1 },
+  { id: "normal", label: "Normal", flowers: 2, note: "Recommended" },
+  { id: "extra",  label: "Extra",  flowers: 3 },
+  { id: "ultra",  label: "Ultra",  flowers: 4 },
+];
+const SPEEDS = [
+  { id: "standard",  label: "Standard",          note: "Ready in 48 hrs",              fee: 0 },
+  { id: "24hrs",     label: "24 Hours",          note: "Ready next day",               fee: 70 },
+  { id: "rush",      label: "Rush (Same Day)",   note: "Cut-off time: 12NN",           fee: 150 },
+  { id: "superrush", label: "Super Rush (5hrs)", note: "Cut-off time: 2PM",            fee: 200 },
+];
+
+const php = n => "₱" + n.toLocaleString("en-PH");
+const flowerSVG = `<i aria-hidden="true">✿</i>`;
+
+// ===== Build bango & speed choices =====
+document.getElementById("bango").innerHTML = BANGO.map(b => `
+  <label class="chip">
+    <input type="radio" name="bango" value="${b.id}" ${b.id === "normal" ? "checked" : ""}>
+    <span><span class="flowers">${flowerSVG.repeat(b.flowers)}</span>${b.label}${b.note ? `<small>${b.note}</small>` : "<small>&nbsp;</small>"}</span>
+  </label>`).join("");
+
+document.getElementById("speeds").innerHTML = SPEEDS.map(s => `
+  <label class="speed">
+    <input type="radio" name="speed" value="${s.id}" data-fee="${s.fee}" ${s.id === "standard" ? "checked" : ""}>
+    <span><span class="nm">${s.label}<small>${s.note}</small></span>
+    <span class="fee">${s.fee ? "+" + s.fee + " php/load" : "FREE"}</span></span>
+  </label>`).join("");
+
+// ===== Load rows =====
+const loadsEl = document.getElementById("loads");
+
+function addLoadRow(typeIdx = 0) {
+  const t = LOAD_TYPES[typeIdx];
+  const row = document.createElement("div");
+  row.className = "load";
+  row.innerHTML = `
+    <select aria-label="Load type">
+      ${LOAD_TYPES.map((lt, i) => `<option value="${i}" ${i === typeIdx ? "selected" : ""}>${lt.label} — ${lt.base}php</option>`).join("")}
+    </select>
+    <div class="kg"><input type="number" value="${t.defaultKg}" min="1" max="${t.maxKg}" step="0.5" aria-label="Weight in kg"></div>
+    <div class="amt"></div>
+    <button type="button" class="del" aria-label="Remove load">×</button>`;
+  loadsEl.appendChild(row);
+  updateTotals();
+}
+
+loadsEl.addEventListener("change", e => {
+  const row = e.target.closest(".load");
+  if (row && e.target.matches("select")) {
+    const t = LOAD_TYPES[+e.target.value];
+    const kg = row.querySelector("input");
+    kg.max = t.maxKg;
+    kg.value = t.defaultKg;
+  }
+  updateTotals();
+});
+loadsEl.addEventListener("input", updateTotals);
+loadsEl.addEventListener("click", e => {
+  if (e.target.matches(".del") && loadsEl.children.length > 1) {
+    e.target.closest(".load").remove();
+    updateTotals();
+  }
+});
+document.getElementById("addLoad").addEventListener("click", () => addLoadRow());
+document.getElementById("speeds").addEventListener("change", updateTotals);
+
+function loadPrice(t, kg) {
+  let price = t.base;
+  if (t.extraPerKg && kg > t.includedKg) price += Math.ceil(kg - t.includedKg) * t.extraPerKg;
+  return price;
+}
+function collectLoads() {
+  return [...loadsEl.querySelectorAll(".load")].map(row => {
+    const t = LOAD_TYPES[+row.querySelector("select").value];
+    let kg = parseFloat(row.querySelector("input").value) || t.defaultKg;
+    kg = Math.min(t.maxKg, Math.max(1, kg));
+    return { type: t.id, label: t.label, kg, amount: loadPrice(t, kg) };
+  });
+}
+function updateTotals() {
+  const loads = collectLoads();
+  const fee = +document.querySelector("input[name=speed]:checked").dataset.fee;
+  const subLoads = loads.reduce((s, l) => s + l.amount, 0);
+  const subSpeed = fee * loads.length;
+  [...loadsEl.querySelectorAll(".load")].forEach((row, i) => {
+    row.querySelector(".amt").textContent = php(loads[i].amount);
+  });
+  document.getElementById("subLoads").textContent = php(subLoads);
+  document.getElementById("subSpeed").textContent = php(subSpeed);
+  document.getElementById("grandTotal").textContent = (subLoads + subSpeed).toLocaleString("en-PH");
+}
+
+// ===== Claim number =====
+const now = new Date();
+const pad = n => String(n).padStart(2, "0");
+const rcpt = `LP-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+// ===== Submit (static mock: swap in GAS endpoint later) =====
+const GAS_ENDPOINT = ""; // paste your GAS web app URL here later
+
+async function submitToGAS(payload) {
+  if (!GAS_ENDPOINT) {
+    await new Promise(r => setTimeout(r, 600));
+    console.log("[mock submit]", payload);
+    return { ok: true };
+  }
+  const res = await fetch(GAS_ENDPOINT, {
+    method: "POST",
+    body: JSON.stringify(payload), // read via e.postData.contents in doPost(e)
+  });
+  return res.json();
+}
+
+document.getElementById("orderForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.target;
+  if (!form.reportValidity()) return;
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+
+  const loads = collectLoads();
+  const speed = document.querySelector("input[name=speed]:checked");
+  const fee = +speed.dataset.fee;
+  const payload = {
+    receiptNo: rcpt,
+    receivedAt: now.toISOString(),
+    name: form.name.value.trim(),
+    phone: form.phone.value.trim(),
+    loads,
+    bango: document.querySelector("input[name=bango]:checked").value,
+    speed: speed.value,
+    notes: form.notes.value.trim(),
+    total: loads.reduce((s, l) => s + l.amount, 0) + fee * loads.length,
+  };
+
+  try {
+    await submitToGAS(payload);
+    form.style.display = "none";
+    document.querySelector(".pricebar").style.display = "none";
+    document.getElementById("rcptNo").textContent = rcpt;
+    document.getElementById("done").classList.add("show");
+    window.scrollTo({ top: 0 });
+  } catch (err) {
+    alert("Something went wrong. Please try again.");
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Drop It Off! 🧺";
+  }
+});
+
+document.getElementById("againBtn").addEventListener("click", () => location.reload());
+
+// first row
+addLoadRow(0);
+</script>
+</body>
+</html>
