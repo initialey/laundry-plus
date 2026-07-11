@@ -7,10 +7,11 @@
 
 ## 機能
 
-- **Loads**: 品目タイプと重量(kg)を入れると自動で料金計算
-  - Assorted Clothes: 240 PHP/load(7kgまで、超過分 +45 PHP/kg)
-  - Blankets / Jeans / Towels: 240 PHP/load(最大5kg)
-  - Wash Only 150 / Dry Only 150 / Fold Only 80(各 最大7kg)
+- **Loads**: サービスと数量(kgまたは枚数)を入れると自動で料金計算
+  - Wash + Dry + Fold: Assorted 240 PHP/load(7kgまで、超過 +45 PHP/kg)/ Blankets・Jeans・Towels 240 PHP/load(最大5kg)
+  - Wash + Dry + Press: 210 PHP/kg(48–72時間仕上げ)
+  - Single Services: Wash Only 150 / Dry Only 150 / Fold Only 80(各 最大7kg)
+  - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを Less / Normal / Extra / Ultra から選択
 - **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load・締切12NN)/ Super Rush 5hrs(+200/load・締切2PM)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
@@ -58,7 +59,7 @@ payload の形:
   "name": "Juan dela Cruz",
   "phone": "0917 123 4567",
   "address": "123 Sample St., Brgy. Uno, Quezon City",
-  "loads": [{ "type": "assorted", "label": "Assorted Clothes (up to 7kg)", "kg": 7, "amount": 240 }],
+  "loads": [{ "type": "assorted", "label": "Assorted Clothes", "qty": 7, "unit": "kg", "amount": 240 }],
   "bango": "normal",
   "speed": "24hrs",
   "notes": "",

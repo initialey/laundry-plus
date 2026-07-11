@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&family=Oswald:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
   --sky: #3fb4e6;
@@ -101,11 +101,17 @@ header { text-align: center; padding: 44px 0 8px; }
   background: var(--white);
   border-radius: 2px;
 }
+.subrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 12px;
+}
 .freebie {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 14px;
   background: var(--white);
   color: var(--ink);
   font-weight: 800;
@@ -115,41 +121,45 @@ header { text-align: center; padding: 44px 0 8px; }
   box-shadow: 0 3px 0 rgba(20, 97, 141, .25);
 }
 .freebie b { color: var(--sky-deep); }
-.ready {
-  margin-top: 16px;
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--yellow);
-  letter-spacing: .04em;
-}
-.ready b { font-size: 19px; }
+.badge48 { width: 104px; height: 104px; flex-shrink: 0; }
 
 /* ── price banner ── */
-.pricebar {
-  margin-top: 22px;
-  text-align: center;
+.pricebar { margin-top: 20px; }
+.prow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
-.pricebar .lead {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1.15;
-}
-.pricebar .big {
-  font-family: var(--display);
+.prow + .prow { margin-top: 2px; }
+.prow .pl {
   font-weight: 800;
-  font-size: clamp(56px, 15vw, 76px);
-  line-height: 1;
+  font-size: 15px;
+  letter-spacing: .02em;
+  text-align: left;
 }
-.pricebar .big small { font-size: .38em; font-weight: 700; }
-.pricebar .subrates {
-  margin-top: 6px;
+.prow .pl small { font-weight: 700; font-size: 11.5px; opacity: .9; }
+.prow.main .pl { font-size: clamp(19px, 5vw, 24px); line-height: 1.12; }
+.prow .pr {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+.prow .num {
+  font-family: "Oswald", var(--display);
+  font-weight: 300;
+  font-size: clamp(52px, 13vw, 72px);
+  line-height: 1;
+  letter-spacing: .01em;
+}
+.prow .num.sm { font-weight: 500; font-size: clamp(24px, 6vw, 32px); }
+.prow .per {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 15px;
-  opacity: .95;
+  font-size: 17px;
 }
+.prow .per small { font-size: 12px; }
 .sulit {
   margin-top: 18px;
   display: flex;
@@ -253,7 +263,7 @@ select {
 }
 .load .kg { position: relative; }
 .load .kg::after {
-  content: "kg";
+  content: attr(data-unit);
   position: absolute;
   right: 10px; top: 50%;
   transform: translateY(-50%);
@@ -408,6 +418,18 @@ select {
   color: var(--pink);
 }
 .totalcard .grand .v small { font-size: 16px; margin-right: 2px; }
+.totalcard .estnote {
+  margin-top: 12px;
+  background: #fff9e6;
+  border: 2px solid var(--yellow);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--ink-deep);
+}
+.totalcard .estnote b { color: var(--yellow-deep); }
 .submit {
   width: 100%;
   padding: 16px;
@@ -537,16 +559,34 @@ footer {
       <span>Laundry<span class="plus">+</span></span>
     </div>
     <div class="tag">Wash + Dry + Fold</div>
-    <div><span class="freebie">🧴 <b>FREE</b>&nbsp;Detergent &amp; Fabcon</span></div>
-    <div class="ready">⏱ Laundry Ready In <b>48 HRS</b></div>
+    <div class="subrow">
+      <span class="freebie">🧴 <b>FREE</b>&nbsp;Detergent &amp; Fabcon</span>
+      <svg class="badge48" viewBox="0 0 120 120" aria-label="Laundry ready in 48 hours">
+        <defs><path id="lr-arc" d="M 12 82 A 52 52 0 1 1 108 82" fill="none"/></defs>
+        <text font-size="12.5" fill="#ffd23f" font-weight="700" font-family="Nunito, sans-serif" letter-spacing="1">
+          <textPath href="#lr-arc" startOffset="14%">Laundry Ready In</textPath>
+        </text>
+        <circle cx="60" cy="72" r="33" fill="none" stroke="#ffd23f" stroke-width="5.5"
+                stroke-dasharray="168 40" stroke-linecap="round" transform="rotate(118 60 72)"/>
+        <polygon points="83,41 99,37 90,52" fill="#ffd23f"/>
+        <text x="60" y="72" text-anchor="middle" font-size="24" font-weight="700" fill="#ffd23f" font-family="'Baloo 2', cursive">48</text>
+        <text x="60" y="92" text-anchor="middle" font-size="15" font-weight="700" fill="#ffd23f" font-family="'Baloo 2', cursive">HRS</text>
+      </svg>
+    </div>
   </header>
 
   <div class="pricebar">
-    <div class="lead">Assorted Clothes<br>Up to 7kg</div>
-    <div class="big">240 <small>PHP/load</small></div>
-    <div class="subrates">
-      ↳ Additional Weight — <b>45 PHP/kg</b><br>
-      Blankets / Jeans / Towels (max 5kg) — <b>240 PHP/load</b>
+    <div class="prow main">
+      <div class="pl">Assorted Clothes<br>Up to 7kg</div>
+      <div class="pr"><span class="num">240</span><span class="per">PHP/load</span></div>
+    </div>
+    <div class="prow">
+      <div class="pl">↳ Additional Weight</div>
+      <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
+    </div>
+    <div class="prow">
+      <div class="pl">Blankets/Jeans/Towels <small>(Max 5kg)</small></div>
+      <div class="pr"><span class="num sm">240</span><span class="per">PHP/Load</span></div>
     </div>
     <div class="sulit">
       <div class="thumb"><span>👍</span>SULIT!</div>
@@ -578,7 +618,7 @@ footer {
       <h2><span class="step">2</span>Your Loads</h2>
       <div class="loads" id="loads"></div>
       <button type="button" class="add-load" id="addLoad">+ Add another load</button>
-      <p class="hint">Assorted: 240 PHP up to 7kg, then +45 PHP/kg. Blankets/Jeans/Towels: max 5kg per load.</p>
+      <p class="hint">Pick a service, then enter the weight (kg) or number of pieces (pc). Wash + Dry + Press is ready in 48–72 hrs.</p>
     </section>
 
     <section class="card">
@@ -603,6 +643,7 @@ footer {
         <span class="t">TOTAL</span>
         <span class="v"><small>₱</small><span id="grandTotal">0</span></span>
       </div>
+      <div class="estnote">⚠️ All prices shown are <b>estimates only</b>. Your final price is determined at the shop after your laundry arrives and is weighed.</div>
     </div>
 
     <button type="submit" class="submit" id="submitBtn">Drop It Off! 🧺</button>
@@ -628,12 +669,21 @@ footer {
 
 <script>
 // ===== Pricing master (sync with GAS sheet later) =====
+// model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
-  { id: "assorted", label: "Assorted Clothes (up to 7kg)", base: 240, includedKg: 7, extraPerKg: 45, maxKg: 15, defaultKg: 7 },
-  { id: "blankets", label: "Blankets / Jeans / Towels",    base: 240, maxKg: 5, defaultKg: 5 },
-  { id: "washonly", label: "Wash Only",                    base: 150, maxKg: 7, defaultKg: 7 },
-  { id: "dryonly",  label: "Dry Only",                     base: 150, maxKg: 7, defaultKg: 7 },
-  { id: "foldonly", label: "Fold Only",                    base: 80,  maxKg: 7, defaultKg: 7 },
+  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, unit: "kg", step: 0.5, max: 20, def: 7, tag: "₱240/load up to 7kg, +₱45/kg" },
+  { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, unit: "kg", step: 0.5, max: 5,  def: 5, tag: "₱240/load, max 5kg" },
+  { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
+  { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱150/load, max 7kg" },
+  { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱150/load, max 7kg" },
+  { group: "Single Services",    id: "foldonly",    label: "Fold Only",                         model: "load", base: 80,  unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱80/load, max 7kg" },
+  { group: "Press Only",         id: "presskg",     label: "Press Only (per kg)",               model: "rate", rate: 155, unit: "kg", step: 0.5, max: 20, def: 1, tag: "₱155/kg, no min" },
+  { group: "Press Only",         id: "tops",        label: "Tops (Shirt, Polo, Long Sleeves)",  model: "rate", rate: 40,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱40/pc" },
+  { group: "Press Only",         id: "bottoms",     label: "Bottoms (Pants, Trousers, Shorts)", model: "rate", rate: 55,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱55/pc" },
+  { group: "Press Only",         id: "simpledress", label: "Simple Dress",                      model: "rate", rate: 80,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱80/pc" },
+  { group: "Press Only",         id: "longdress",   label: "Long Dress",                        model: "rate", rate: 105, unit: "pc", step: 1, max: 50, def: 1, tag: "₱105/pc" },
+  { group: "Press Only",         id: "jacket",      label: "Jacket",                            model: "rate", rate: 105, unit: "pc", step: 1, max: 50, def: 1, tag: "₱105/pc" },
+  { group: "Press Only",         id: "hanger",      label: "Hanger w/ Dust Bag",                model: "rate", rate: 20,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱20/pc" },
 ];
 const BANGO = [
   { id: "less",   label: "Less",   flowers: 1 },
@@ -668,15 +718,26 @@ document.getElementById("speeds").innerHTML = SPEEDS.map(s => `
 // ===== Load rows =====
 const loadsEl = document.getElementById("loads");
 
+function loadTypeOptions(selectedIdx) {
+  let html = "", lastGroup = null;
+  LOAD_TYPES.forEach((t, i) => {
+    if (t.group !== lastGroup) {
+      if (lastGroup !== null) html += "</optgroup>";
+      html += `<optgroup label="${t.group}">`;
+      lastGroup = t.group;
+    }
+    html += `<option value="${i}" ${i === selectedIdx ? "selected" : ""}>${t.label} — ${t.tag}</option>`;
+  });
+  return html + "</optgroup>";
+}
+
 function addLoadRow(typeIdx = 0) {
   const t = LOAD_TYPES[typeIdx];
   const row = document.createElement("div");
   row.className = "load";
   row.innerHTML = `
-    <select aria-label="Load type">
-      ${LOAD_TYPES.map((lt, i) => `<option value="${i}" ${i === typeIdx ? "selected" : ""}>${lt.label} — ${lt.base}php</option>`).join("")}
-    </select>
-    <div class="kg"><input type="number" value="${t.defaultKg}" min="1" max="${t.maxKg}" step="0.5" aria-label="Weight in kg"></div>
+    <select aria-label="Service / item">${loadTypeOptions(typeIdx)}</select>
+    <div class="kg" data-unit="${t.unit}"><input type="number" value="${t.def}" min="${t.step}" max="${t.max}" step="${t.step}" aria-label="Quantity"></div>
     <div class="amt"></div>
     <button type="button" class="del" aria-label="Remove load">×</button>`;
   loadsEl.appendChild(row);
@@ -687,9 +748,13 @@ loadsEl.addEventListener("change", e => {
   const row = e.target.closest(".load");
   if (row && e.target.matches("select")) {
     const t = LOAD_TYPES[+e.target.value];
-    const kg = row.querySelector("input");
-    kg.max = t.maxKg;
-    kg.value = t.defaultKg;
+    const wrap = row.querySelector(".kg");
+    wrap.dataset.unit = t.unit;
+    const inp = wrap.querySelector("input");
+    inp.min = t.step;
+    inp.max = t.max;
+    inp.step = t.step;
+    inp.value = t.def;
   }
   updateTotals();
 });
@@ -703,17 +768,18 @@ loadsEl.addEventListener("click", e => {
 document.getElementById("addLoad").addEventListener("click", () => addLoadRow());
 document.getElementById("speeds").addEventListener("change", updateTotals);
 
-function loadPrice(t, kg) {
+function loadPrice(t, qty) {
+  if (t.model === "rate") return Math.round(t.rate * qty);
   let price = t.base;
-  if (t.extraPerKg && kg > t.includedKg) price += Math.ceil(kg - t.includedKg) * t.extraPerKg;
+  if (t.extraPerKg && qty > t.includedKg) price += Math.ceil(qty - t.includedKg) * t.extraPerKg;
   return price;
 }
 function collectLoads() {
   return [...loadsEl.querySelectorAll(".load")].map(row => {
     const t = LOAD_TYPES[+row.querySelector("select").value];
-    let kg = parseFloat(row.querySelector("input").value) || t.defaultKg;
-    kg = Math.min(t.maxKg, Math.max(1, kg));
-    return { type: t.id, label: t.label, kg, amount: loadPrice(t, kg) };
+    let qty = parseFloat(row.querySelector("input").value) || t.def;
+    qty = Math.min(t.max, Math.max(t.step, qty));
+    return { type: t.id, label: t.label, qty, unit: t.unit, amount: loadPrice(t, qty) };
   });
 }
 function updateTotals() {

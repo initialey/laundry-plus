@@ -21,9 +21,9 @@ function doPost(e) {
     ]);
   }
 
-  // Human-readable summary of the loads
+  // Human-readable summary of the loads (unit is "kg" or "pc")
   const loadsText = (data.loads || [])
-    .map(function (l) { return l.label + " " + l.kg + "kg = P" + l.amount; })
+    .map(function (l) { return l.label + " " + (l.qty || l.kg) + (l.unit || "kg") + " = P" + l.amount; })
     .join("\n");
 
   sheet.appendRow([
