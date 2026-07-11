@@ -823,7 +823,10 @@ const SPEEDS = [
   { id: "superrush", label: "Super Rush (5hrs)", note: "Cut-off time: 2PM",            fee: 200 },
 ];
 const ADDONS = [
-  { id: "bleach", label: "Bleach", fee: 20 }, // fee is per load
+  // per: "load" multiplies by the number of loads; "order" is a one-time fee
+  { id: "bleach",    label: "Bleach",          fee: 20,  per: "load"  },
+  { id: "detergent", label: "Extra Detergent", fee: 10,  per: "load"  },
+  { id: "bag",       label: "Laundry+ Bag",    fee: 200, per: "order" },
 ];
 
 const php = n => "₱" + n.toLocaleString("en-PH");
@@ -838,9 +841,9 @@ document.getElementById("bango").innerHTML = BANGO.map(b => `
 
 document.getElementById("addons").innerHTML = ADDONS.map(a => `
   <label class="check">
-    <input type="checkbox" name="addon" value="${a.id}" data-fee="${a.fee}">
+    <input type="checkbox" name="addon" value="${a.id}">
     <span>${a.label}</span>
-    <span class="fee2">+₱${a.fee}/load</span>
+    <span class="fee2">+₱${a.fee}${a.per === "load" ? "/load" : ""}</span>
   </label>`).join("");
 document.getElementById("addons").addEventListener("change", updateTotals);
 
@@ -923,11 +926,13 @@ function collectLoads() {
 function computeTotals() {
   const loads = collectLoads();
   const fee = +document.querySelector("input[name=speed]:checked").dataset.fee;
-  const addonFee = [...document.querySelectorAll("input[name=addon]:checked")]
-    .reduce((s, a) => s + +a.dataset.fee, 0);
   const subLoads = loads.reduce((s, l) => s + l.amount, 0);
   const subSpeed = fee * loads.length;
-  const subAddons = addonFee * loads.length;
+  const subAddons = [...document.querySelectorAll("input[name=addon]:checked")]
+    .reduce((s, el) => {
+      const a = ADDONS.find(x => x.id === el.value);
+      return s + (a.per === "load" ? a.fee * loads.length : a.fee);
+    }, 0);
   return { loads, subLoads, subSpeed, subAddons, total: subLoads + subSpeed + subAddons };
 }
 function updateTotals() {
@@ -1052,7 +1057,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   const { loads, total } = computeTotals();
   const addons = [...document.querySelectorAll("input[name=addon]:checked")].map(el => {
     const a = ADDONS.find(x => x.id === el.value);
-    return `${a.label} (+₱${a.fee}/load)`;
+    return `${a.label} (+₱${a.fee}${a.per === "load" ? "/load" : ""})`;
   });
   const prefs = [...document.querySelectorAll("input[name=pref]:checked")].map(el => el.value);
   const payload = {
