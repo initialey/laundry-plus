@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
   --sky: #3fb4e6;
@@ -21,7 +21,7 @@
   --pink: #f06fa8;
   --pink-soft: #f8a8cb;
   --display: "Baloo 2", cursive;
-  --body: "Nunito", sans-serif;
+  --body: "Poppins", sans-serif;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { overflow-x: hidden; }
@@ -148,15 +148,15 @@ header { text-align: center; padding: 44px 0 8px; }
   white-space: nowrap;
 }
 .prow .num {
-  font-family: var(--display);
-  font-weight: 500;
+  font-family: var(--body);
+  font-weight: 600;
   font-size: clamp(44px, 11vw, 64px);
   line-height: 1;
   letter-spacing: .01em;
 }
 .prow .num.sm { font-weight: 600; font-size: clamp(22px, 5.5vw, 30px); }
 .prow .per {
-  font-family: var(--display);
+  font-family: var(--body);
   font-weight: 700;
   font-size: 17px;
 }
@@ -196,9 +196,9 @@ form { margin-top: 30px; display: flex; flex-direction: column; gap: 18px; }
   box-shadow: 0 5px 0 rgba(20, 97, 141, .28);
 }
 .card h2 {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 20px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 18px;
   color: var(--sky-deep);
   margin-bottom: 12px;
   display: flex;
@@ -276,8 +276,8 @@ select {
 .load .kg input { padding-right: 30px; -moz-appearance: textfield; }
 .load .kg input::-webkit-outer-spin-button, .load .kg input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .load .amt {
-  font-family: var(--display);
-  font-weight: 800;
+  font-family: var(--body);
+  font-weight: 700;
   font-size: 15px;
   text-align: right;
   color: var(--sky-deep);
@@ -303,9 +303,9 @@ select {
   background: transparent;
   border: 2px dashed #9ed6f0;
   border-radius: 12px;
-  font-family: var(--display);
+  font-family: var(--body);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--sky-deep);
   cursor: pointer;
   transition: all .15s;
@@ -368,8 +368,8 @@ select {
 .speed .nm { font-weight: 800; font-size: 14px; }
 .speed .nm small { display: block; font-size: 10.5px; font-weight: 700; color: #6aa9c9; }
 .speed .fee {
-  font-family: var(--display);
-  font-weight: 800;
+  font-family: var(--body);
+  font-weight: 700;
   font-size: 14px;
   color: var(--sky-deep);
   white-space: nowrap;
@@ -407,15 +407,15 @@ select {
   border-top: 2px dashed #cdeaf8;
 }
 .totalcard .grand .t {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 18px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 17px;
   color: var(--sky-deep);
 }
 .totalcard .grand .v {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 34px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 32px;
   color: var(--pink);
 }
 .totalcard .grand .v small { font-size: 16px; margin-right: 2px; }
@@ -438,9 +438,9 @@ select {
   color: var(--ink-deep);
   border: 0;
   border-radius: 999px;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 20px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 18px;
   letter-spacing: .03em;
   cursor: pointer;
   box-shadow: 0 5px 0 var(--yellow-deep);
@@ -473,9 +473,9 @@ select {
   margin-top: 16px;
   background: var(--white);
   color: var(--ink-deep);
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 17px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 16px;
   letter-spacing: .04em;
   padding: 10px 24px;
   border-radius: 999px;
@@ -489,9 +489,9 @@ select {
   color: var(--white);
   padding: 10px 28px;
   border-radius: 999px;
-  font-family: var(--display);
+  font-family: var(--body);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   transition: all .15s;
 }
@@ -583,14 +583,14 @@ footer {
       <span class="freebie">🧴 <b>FREE</b>&nbsp;Detergent &amp; Fabcon</span>
       <svg class="badge48" viewBox="0 0 120 120" aria-label="Laundry ready in 48 hours">
         <defs><path id="lr-arc" d="M 12 82 A 52 52 0 1 1 108 82" fill="none"/></defs>
-        <text font-size="12.5" fill="#ffd23f" font-weight="700" font-family="Nunito, sans-serif" letter-spacing="1">
+        <text font-size="12.5" fill="#ffd23f" font-weight="600" font-family="Poppins, sans-serif" letter-spacing="1">
           <textPath href="#lr-arc" startOffset="14%">Laundry Ready In</textPath>
         </text>
         <circle cx="60" cy="72" r="33" fill="none" stroke="#ffd23f" stroke-width="5.5"
                 stroke-dasharray="168 40" stroke-linecap="round" transform="rotate(118 60 72)"/>
         <polygon points="83,41 99,37 90,52" fill="#ffd23f"/>
-        <text x="60" y="72" text-anchor="middle" font-size="24" font-weight="700" fill="#ffd23f" font-family="'Baloo 2', cursive">48</text>
-        <text x="60" y="92" text-anchor="middle" font-size="15" font-weight="700" fill="#ffd23f" font-family="'Baloo 2', cursive">HRS</text>
+        <text x="60" y="72" text-anchor="middle" font-size="24" font-weight="600" fill="#ffd23f" font-family="Poppins, sans-serif">48</text>
+        <text x="60" y="92" text-anchor="middle" font-size="14" font-weight="600" fill="#ffd23f" font-family="Poppins, sans-serif">HRS</text>
       </svg>
     </div>
   </header>
