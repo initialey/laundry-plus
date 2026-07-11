@@ -731,7 +731,7 @@ const pad = n => String(n).padStart(2, "0");
 const rcpt = `LP-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
 // ===== Submit (static mock: swap in GAS endpoint later) =====
-const GAS_ENDPOINT = ""; // paste your GAS web app URL here later
+const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwngDiaWySIxwaZ6Uktgwg10rAWscajSLIpUFVG-7tHdHz8yYHhGArudp8ZXDs9U49q/exec";
 
 async function submitToGAS(payload) {
   if (!GAS_ENDPOINT) {
