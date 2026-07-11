@@ -15,11 +15,21 @@
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
 - **Add-ons & Preferences**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)、白物・色物の分け洗い希望(追加料金・店頭確認)、デリケート品・色落ちの有無チェック
 - **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load・締切12NN)/ Super Rush 5hrs(+200/load・締切2PM)
-- **集配スケジュール**: 希望ピックアップ/デリバリーの日付と1時間スロットを選択
+- **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と1時間スロットを選択
   - 集配時間: 平日 8AM–9PM / 週末 9AM–7PM(営業時間は毎日 5AM–11PM)
-  - スロットは GAS 側で1時間あたりの件数を制限(`SLOT_CAP`、デフォルト2件)。満枠のスロットは FULL 表示で選択不可
-- **連絡先**: Facebook アカウント欄と希望連絡手段(SMS / Call / Messenger)
+  - デリバリー日はスピードに連動(Standard=ピックアップ+2日以降 / 24 Hours=+1日以降 / Rush・Super Rush=当日以降)
+  - スロットは GAS 側で1時間あたりの件数を制限(`SLOT_CAP`、デフォルト2件)。満枠・ブロック済みスロットは FULL 表示で選択不可
+- **連絡先**: Facebook アカウント欄と希望連絡手段(SMS / Messenger)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
+
+## 管理画面(admin.html)
+
+`admin.html` は集配スロットの空き状況ダッシュボードです。
+
+- 日付ごとに各スロットの予約数(n/cap)、予約者(名前・電話・受付番号・スピード・ステータス)を表示
+- スロット単位で **BLOCK / UNBLOCK** — ブロックしたスロットは予約フォームで FULL 表示になり選択不可
+- アクセスには管理キーが必要: `gas/Code.gs` の `ADMIN_KEY` を自分だけの値に変更し、admin.html の Key 欄に同じ値を入力(端末に保存されます)
+- ブロック情報はスプレッドシートの `BlockedSlots` シートに保存(直接編集も可)
 
 ## 使い方(ローカルで開く)
 
