@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&family=Oswald:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
   --sky: #3fb4e6;
@@ -24,6 +24,7 @@
   --body: "Nunito", sans-serif;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { overflow-x: hidden; }
 
 body {
   font-family: var(--body);
@@ -147,13 +148,13 @@ header { text-align: center; padding: 44px 0 8px; }
   white-space: nowrap;
 }
 .prow .num {
-  font-family: "Oswald", var(--display);
-  font-weight: 300;
-  font-size: clamp(52px, 13vw, 72px);
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(44px, 11vw, 64px);
   line-height: 1;
   letter-spacing: .01em;
 }
-.prow .num.sm { font-weight: 500; font-size: clamp(24px, 6vw, 32px); }
+.prow .num.sm { font-weight: 600; font-size: clamp(22px, 5.5vw, 30px); }
 .prow .per {
   font-family: var(--display);
   font-weight: 700;
@@ -507,16 +508,23 @@ footer {
   opacity: .9;
 }
 @media (max-width: 640px) {
-  /* shrink the corner clouds so they never sit behind the white text */
-  .cloud { transform: scale(.55); }
-  .cloud.tl { transform-origin: -80px -70px; }
-  .cloud.tr { transform-origin: calc(100% + 70px) -90px; }
-  .cloud.bl { transform-origin: -70px calc(100% + 90px); }
-  .cloud.br { transform-origin: calc(100% + 90px) calc(100% + 70px); }
-  header { padding-top: 36px; }
+  /* tuck the clouds into the corners: still visible, never behind the text */
+  .cloud.tl { top: -105px; left: -125px; }
+  .cloud.tr { top: -115px; right: -115px; }
+  .cloud.bl { bottom: -115px; left: -115px; }
+  .cloud.br { bottom: -105px; right: -125px; }
+  header { padding-top: 92px; }
   .subrow { gap: 10px; }
   .badge48 { width: 84px; height: 84px; }
-  footer { padding-bottom: 44px; }
+  footer { padding: 10px 0 100px; }
+  /* keep the price rows inside the viewport */
+  .prow { gap: 10px; }
+  .prow .pl, .prow .pr { min-width: 0; }
+  .prow .pl { font-size: 13px; overflow-wrap: anywhere; }
+  .prow.main .pl { font-size: 18px; }
+  .prow .num { font-size: 42px; }
+  .prow .num.sm { font-size: 21px; }
+  .prow .per { font-size: 14px; }
 }
 @media (max-width: 440px) {
   .load { grid-template-columns: 1fr 76px 28px; }
