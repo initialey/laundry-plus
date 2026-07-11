@@ -506,6 +506,18 @@ footer {
   letter-spacing: .12em;
   opacity: .9;
 }
+@media (max-width: 640px) {
+  /* shrink the corner clouds so they never sit behind the white text */
+  .cloud { transform: scale(.55); }
+  .cloud.tl { transform-origin: -80px -70px; }
+  .cloud.tr { transform-origin: calc(100% + 70px) -90px; }
+  .cloud.bl { transform-origin: -70px calc(100% + 90px); }
+  .cloud.br { transform-origin: calc(100% + 90px) calc(100% + 70px); }
+  header { padding-top: 36px; }
+  .subrow { gap: 10px; }
+  .badge48 { width: 84px; height: 84px; }
+  footer { padding-bottom: 44px; }
+}
 @media (max-width: 440px) {
   .load { grid-template-columns: 1fr 76px 28px; }
   .load .amt { display: none; }
