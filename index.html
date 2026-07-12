@@ -423,6 +423,7 @@ select {
   background: #fff9e6;
   box-shadow: 0 3px 0 rgba(245,184,32,.35);
 }
+.speed input:disabled + span { opacity: .45; cursor: not-allowed; }
 .speed input:checked + span .fee { color: var(--yellow-deep); }
 .speed input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
 
@@ -708,6 +709,10 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     <section class="card">
       <h2><span class="step">4</span>Separate load by</h2>
       <div class="speeds" id="separation"></div>
+      <div class="field" id="bagCountField" style="display:none; margin-top:10px">
+        <label class="lbl" for="bagCount">No. of Bags<span class="req">*</span></label>
+        <input type="number" id="bagCount" name="bagCount" min="1" max="30" step="1" placeholder="e.g. 3" inputmode="numeric" data-err="Please enter how many bags.">
+      </div>
       <p class="hint">Additional charges will apply for separated washing — confirmed at the shop.</p>
     </section>
 
@@ -729,6 +734,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     <section class="card">
       <h2><span class="step">6</span>Need It Faster?</h2>
       <div class="speeds" id="speeds"></div>
+      <p class="hint">Rush (Same Day) is available for pickups up to 4:00 PM. Later pickups can still choose Super Rush.</p>
     </section>
 
     <section class="card">
@@ -817,12 +823,13 @@ const BANGO = [
   { id: "extra",  label: "Extra",  flowers: 3 },
   { id: "ultra",  label: "Ultra",  flowers: 4 },
 ];
-// days = earliest delivery, counted from the pickup date
+// hours = turnaround: earliest delivery slot is pickup time + this many hours
+// cutoff = last pickup slot hour (24h) this speed can still be chosen for
 const SPEEDS = [
-  { id: "standard",  label: "Standard",          note: "Ready in 48 hrs",              fee: 0,   days: 2 },
-  { id: "24hrs",     label: "24 Hours",          note: "Ready next day",               fee: 70,  days: 1 },
-  { id: "rush",      label: "Rush (Same Day)",   note: "Cut-off time: 12NN",           fee: 150, days: 0 },
-  { id: "superrush", label: "Super Rush (5hrs)", note: "Cut-off time: 2PM",            fee: 200, days: 0 },
+  { id: "standard",  label: "Standard",          note: "Ready in 48 hrs",              fee: 0,   hours: 48 },
+  { id: "24hrs",     label: "24 Hours",          note: "Ready next day",               fee: 70,  hours: 24 },
+  { id: "rush",      label: "Rush (Same Day)",   note: "Pickup by 4PM",                fee: 150, hours: 6, cutoff: 16 },
+  { id: "superrush", label: "Super Rush (5hrs)", note: "Ready in 5 hrs",               fee: 200, hours: 5 },
 ];
 const ADDONS = [
   // per: "load" multiplies by the number of loads; "order" is a one-time fee
@@ -855,6 +862,19 @@ document.getElementById("separation").innerHTML = SEPARATION.map(s => `
     <span><span class="nm">${s.label}<small>${s.note}</small></span>
     <span class="fee">${s.free ? "FREE" : "Additional Charge"}</span></span>
   </label>`).join("");
+
+// "Per Bag" needs the number of bags for the shop's estimate
+const bagField = document.getElementById("bagCountField");
+const bagCount = document.getElementById("bagCount");
+function updateBagField() {
+  const perBag = document.querySelector("input[name=separation]:checked").value === "Per Bag";
+  bagField.style.display = perBag ? "" : "none";
+  bagCount.required = perBag;
+  if (!perBag) bagCount.setCustomValidity("");
+}
+document.getElementById("separation").addEventListener("change", updateBagField);
+bagCount.addEventListener("invalid", () => bagCount.setCustomValidity(bagCount.dataset.err));
+bagCount.addEventListener("input", () => bagCount.setCustomValidity(""));
 
 document.getElementById("addons").innerHTML = ADDONS.map(a => `
   <label class="check">
@@ -998,7 +1018,9 @@ async function fetchSlotCounts(date) {
   }
 }
 
-async function refreshSlots(dateInput, timeSelect) {
+// notBefore (optional Date): hide slots starting before that moment —
+// used to keep delivery slots after pickup time + the speed's turnaround
+async function refreshSlots(dateInput, timeSelect, notBefore) {
   if (!dateInput.value) {
     timeSelect.innerHTML = `<option value="" selected disabled>Choose a date first</option>`;
     return;
@@ -1014,6 +1036,11 @@ async function refreshSlots(dateInput, timeSelect) {
   let anyOpen = false, keptPrev = false;
   for (let h = start; h < end; h++) {
     if (isToday && h <= today.getHours()) continue; // needs at least an hour's notice
+    if (notBefore) {
+      const slotStart = new Date(d);
+      slotStart.setHours(h);
+      if (slotStart < notBefore) continue;
+    }
     const v = pad(h) + ":00";
     const full = !!(avail && avail.counts && avail.counts[v] >= (avail.cap || 99));
     const sel = prev === v && !full;
@@ -1041,27 +1068,58 @@ function fillDateSelect(sel, fromDate, placeholder) {
   if (!kept) sel.value = "";
   return kept;
 }
-const speedDays = () => SPEEDS.find(s => s.id === document.querySelector("input[name=speed]:checked").value).days;
+const chosenSpeed = () => SPEEDS.find(s => s.id === document.querySelector("input[name=speed]:checked").value);
 
-// delivery dates start at pickup date + the chosen speed's turnaround
-// (e.g. Standard 48hrs → earliest delivery is 2 days after pickup)
+// Earliest possible delivery moment: pickup time + the speed's turnaround
+// hours (e.g. 11AM pickup + Super Rush 5hrs → 4PM). If no pickup time is
+// chosen yet, assume the day's first slot.
+function earliestDelivery() {
+  if (!pickupDate.value) return null;
+  const d = new Date(pickupDate.value + "T00:00:00");
+  d.setHours(pickupTime.value ? parseInt(pickupTime.value, 10) : slotHours(d).start);
+  d.setHours(d.getHours() + chosenSpeed().hours);
+  return d;
+}
+
 function refreshDeliveryDates() {
-  if (!pickupDate.value) {
+  const from = earliestDelivery();
+  if (!from) {
     deliveryDate.innerHTML = `<option value="" selected disabled>Choose pickup date first</option>`;
     refreshSlots(deliveryDate, deliveryTime);
     return;
   }
-  const from = new Date(pickupDate.value + "T00:00:00");
-  from.setDate(from.getDate() + speedDays());
-  const kept = fillDateSelect(deliveryDate, from, "Choose delivery date");
-  if (!kept) refreshSlots(deliveryDate, deliveryTime);
+  fillDateSelect(deliveryDate, from, "Choose delivery date");
+  refreshSlots(deliveryDate, deliveryTime, from);
+}
+
+// Speeds with a pickup-time cutoff (e.g. Rush needs pickup by 4PM) get
+// disabled for later pickups; if the disabled one was selected, fall back
+// to Standard (never auto-pick a pricier option).
+function updateSpeedAvailability() {
+  const ph = pickupTime.value ? parseInt(pickupTime.value, 10) : null;
+  let switched = false;
+  SPEEDS.forEach(s => {
+    const input = document.querySelector(`input[name=speed][value="${s.id}"]`);
+    const off = s.cutoff != null && ph != null && ph > s.cutoff;
+    input.disabled = off;
+    if (off && input.checked) {
+      document.querySelector(`input[name=speed][value="standard"]`).checked = true;
+      switched = true;
+    }
+  });
+  if (switched) updateTotals();
 }
 
 pickupDate.addEventListener("change", () => {
   refreshSlots(pickupDate, pickupTime);
+  updateSpeedAvailability();
   refreshDeliveryDates();
 });
-deliveryDate.addEventListener("change", () => refreshSlots(deliveryDate, deliveryTime));
+pickupTime.addEventListener("change", () => {
+  updateSpeedAvailability();
+  refreshDeliveryDates();
+});
+deliveryDate.addEventListener("change", () => refreshSlots(deliveryDate, deliveryTime, earliestDelivery()));
 document.getElementById("speeds").addEventListener("change", refreshDeliveryDates);
 
 fillDateSelect(pickupDate, new Date(now.getFullYear(), now.getMonth(), now.getDate()), "Choose pickup date");
@@ -1118,7 +1176,10 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     delivery: `${deliveryDate.value} ${deliveryTime.value}`,
     loads,
     bango: document.querySelector("input[name=bango]:checked").value,
-    separation: document.querySelector("input[name=separation]:checked").value,
+    separation: (() => {
+      const s = document.querySelector("input[name=separation]:checked").value;
+      return s === "Per Bag" ? `Per Bag × ${parseInt(bagCount.value, 10)} bags` : s;
+    })(),
     addons,
     prefs,
     speed: speed.value,
