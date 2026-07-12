@@ -706,7 +706,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">4</span>Separation</h2>
+      <h2><span class="step">4</span>Separate load by</h2>
       <div class="speeds" id="separation"></div>
       <p class="hint">Additional charges will apply for separated washing — confirmed at the shop.</p>
     </section>
@@ -853,7 +853,7 @@ document.getElementById("separation").innerHTML = SEPARATION.map(s => `
   <label class="speed">
     <input type="radio" name="separation" value="${s.label}" ${s.id === "mixed" ? "checked" : ""}>
     <span><span class="nm">${s.label}<small>${s.note}</small></span>
-    <span class="fee">${s.free ? "FREE" : "add’l charge"}</span></span>
+    <span class="fee">${s.free ? "FREE" : "Additional Charge"}</span></span>
   </label>`).join("");
 
 document.getElementById("addons").innerHTML = ADDONS.map(a => `
