@@ -706,13 +706,15 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">4</span>Add-ons &amp; Preferences</h2>
+      <h2><span class="step">4</span>Separation</h2>
+      <div class="speeds" id="separation"></div>
+      <p class="hint">Additional charges will apply for separated washing — confirmed at the shop.</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">5</span>Add-ons &amp; Preferences</h2>
       <div class="checks" id="addons"></div>
       <div class="checks">
-        <label class="check">
-          <input type="checkbox" name="pref" value="Separate whites &amp; colors">
-          <span>Do you prefer your whites and colors separated?<small>Additional charges will apply — confirmed at the shop.</small></span>
-        </label>
         <label class="check">
           <input type="checkbox" name="pref" value="Has delicate / hand-wash items">
           <span>Any delicate or hand-wash items?</span>
@@ -725,12 +727,12 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">5</span>Need It Faster?</h2>
+      <h2><span class="step">6</span>Need It Faster?</h2>
       <div class="speeds" id="speeds"></div>
     </section>
 
     <section class="card">
-      <h2><span class="step">6</span>Pickup &amp; Delivery Schedule</h2>
+      <h2><span class="step">7</span>Pickup &amp; Delivery Schedule</h2>
       <div class="row">
         <div class="field">
           <label class="lbl" for="pickupDate">Preferred Pickup Date<span class="req">*</span></label>
@@ -753,7 +755,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">7</span>Notes</h2>
+      <h2><span class="step">8</span>Notes</h2>
       <textarea id="notes" name="notes" placeholder="Stains, delicate items, special instructions…"></textarea>
     </section>
 
@@ -828,6 +830,14 @@ const ADDONS = [
   { id: "detergent", label: "Extra Detergent", fee: 10,  per: "load"  },
   { id: "bag",       label: "Laundry+ Bag",    fee: 200, per: "order" },
 ];
+// How the customer wants their laundry separated (extra charges confirmed in-store)
+const SEPARATION = [
+  { id: "whites",     label: "Whites & Colored",   note: "Whites washed separately from colored" },
+  { id: "bedclothes", label: "Beddings & Clothes", note: "Beddings washed separately from clothes" },
+  { id: "bedtowels",  label: "Beddings & Towels",  note: "Beddings washed separately from towels" },
+  { id: "perbag",     label: "Per Bag",            note: "Each bag washed separately" },
+  { id: "mixed",      label: "Mixed",              note: "Everything washed together", free: true },
+];
 
 const php = n => "₱" + n.toLocaleString("en-PH");
 const flowerSVG = `<i aria-hidden="true">✿</i>`;
@@ -837,6 +847,13 @@ document.getElementById("bango").innerHTML = BANGO.map(b => `
   <label class="chip">
     <input type="radio" name="bango" value="${b.id}" ${b.id === "normal" ? "checked" : ""}>
     <span><span class="flowers">${b.flowers ? flowerSVG.repeat(b.flowers) : `<i class="none" aria-hidden="true">—</i>`}</span>${b.label}${b.note ? `<small>${b.note}</small>` : "<small>&nbsp;</small>"}</span>
+  </label>`).join("");
+
+document.getElementById("separation").innerHTML = SEPARATION.map(s => `
+  <label class="speed">
+    <input type="radio" name="separation" value="${s.label}" ${s.id === "mixed" ? "checked" : ""}>
+    <span><span class="nm">${s.label}<small>${s.note}</small></span>
+    <span class="fee">${s.free ? "FREE" : "add’l charge"}</span></span>
   </label>`).join("");
 
 document.getElementById("addons").innerHTML = ADDONS.map(a => `
@@ -1101,6 +1118,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     delivery: `${deliveryDate.value} ${deliveryTime.value}`,
     loads,
     bango: document.querySelector("input[name=bango]:checked").value,
+    separation: document.querySelector("input[name=separation]:checked").value,
     addons,
     prefs,
     speed: speed.value,

@@ -25,8 +25,8 @@ const ADMIN_KEY = "CHANGE_ME_ADMIN_KEY";
 const SHEET_NAME = "Orders";
 const HEADERS = [
   "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
-  "Address", "Pickup", "Delivery", "Loads", "Bango", "Add-ons", "Preferences",
-  "Speed", "Notes", "Total (PHP)",
+  "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
+  "Preferences", "Speed", "Notes", "Total (PHP)",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -69,6 +69,7 @@ function doPost(e) {
     data.delivery ? "'" + data.delivery : "",
     loadsText,
     data.bango,
+    data.separation || "",
     addonsText,
     prefsText,
     data.speed,
@@ -87,7 +88,8 @@ function doPost(e) {
       "🚚 Pickup: " + (data.pickup || "-") + "\n" +
       "🏠 Delivery: " + (data.delivery || "-") + "\n\n" +
       loadsText + "\n\n" +
-      "🌸 Bango: " + data.bango + " / ⏱ " + data.speed +
+      "🌸 Bango: " + data.bango + " / ⏱ " + data.speed + "\n" +
+      "🧦 Separation: " + (data.separation || "-") +
       (addonsText ? "\n➕ " + (data.addons || []).join(", ") : "") +
       (prefsText ? "\n✅ " + (data.prefs || []).join(", ") : "") +
       (data.notes ? "\n📝 " + data.notes : "") + "\n" +
