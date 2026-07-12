@@ -13,7 +13,8 @@
   - Single Services: Wash Only 150 / Dry Only 150 / Fold Only 80(各 最大7kg)
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
-- **Add-ons & Preferences**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)、白物・色物の分け洗い希望(追加料金・店頭確認)、デリケート品・色落ちの有無チェック
+- **Separation(洗い分け)**: Whites & Colored / Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は追加料金(店頭確認)
+- **Add-ons & Preferences**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)、デリケート品・色落ちの有無チェック
 - **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load・締切12NN)/ Super Rush 5hrs(+200/load・締切2PM)
 - **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と1時間スロットを選択
   - 集配時間: 平日 8AM–9PM / 週末 9AM–7PM(営業時間は毎日 5AM–11PM)
@@ -52,6 +53,7 @@ python3 -m http.server 8787
 - `BANGO` — 香りレベル
 - `SPEEDS` — 仕上がりスピードと追加料金(fee)
 - `ADDONS` — アドオン(`per: "load"` はロード数×fee、`per: "order"` は1回限りの固定額)
+- `SEPARATION` — 洗い分けの選択肢
 - `slotHours` — 集配スロットの時間帯(平日/週末)。スロット上限は `gas/Code.gs` の `SLOT_CAP`
 
 ## Google Apps Script(GAS)連携
@@ -82,8 +84,9 @@ payload の形:
   "delivery": "2026-07-14 18:00",
   "loads": [{ "type": "assorted", "label": "Assorted Clothes", "qty": 7, "unit": "kg", "amount": 240 }],
   "bango": "normal",
+  "separation": "Whites & Colored",
   "addons": ["Bleach (+₱20/load)"],
-  "prefs": ["Separate whites & colors"],
+  "prefs": ["Has delicate / hand-wash items"],
   "speed": "24hrs",
   "notes": "",
   "total": 640
