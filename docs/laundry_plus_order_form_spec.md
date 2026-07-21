@@ -65,9 +65,39 @@ while remaining > 0:
 - **₱240 / 5kgロード**。5kgを超えるごとに新しいロード(= `ceil(kg / 5) × 240`)。
 - 例: 6kg = 2ロード = ₱480、12kg = 3ロード = ₱720。load数 = `ceil(kg / 5)`。
 
-### §3.3 Single Services
+### §3.3 Single Services — 12kgブロック方式(§3.1と同一構造)
 
-- Wash Only ₱150 / Dry Only ₱150 / Fold Only ₱80(いずれも1ロード最大7kg)。load数 = 1。
+§3.1と同じ12kgブロックリセット方式で、base / excess_rate のみサービスごとに異なる:
+
+| サービス | base(7kgまで) | excess_rate(超過/kg・切り上げ) | ブロック上限額 |
+|---|---|---|---|
+| Wash Only | ₱150 | +₱30/kg | ₱300 |
+| Dry Only | ₱150 | +₱30/kg | ₱300 |
+| Fold Only | ₱80 | +₱15/kg | ₱155 |
+
+```
+total = 0; remaining = kg
+while remaining > 0:
+    block = min(remaining, 12)
+    total += base + max(0, ceil(block - 7)) * excess_rate
+    remaining -= block
+```
+
+load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入力上限36kg。
+
+検証用テストケース:
+
+| kg | Wash/Dry Only | Fold Only |
+|---|---|---|
+| 5 | ₱150 | ₱80 |
+| 7 | ₱150 | ₱80 |
+| 7.1 | ₱180 | ₱95 |
+| 12 | ₱300 | ₱155 |
+| 12.1 | ₱450 | ₱235 |
+| 19 | ₱450 | ₱235 |
+| 20 | ₱480 | ₱250 |
+| 24 | ₱600 | ₱310 |
+| 24.1 | ₱750 | ₱390 |
 
 ### §3.4 Wash + Dry + Press / Press Only
 
@@ -104,8 +134,10 @@ while remaining > 0:
 | rush | Rush (Same Day) | +₱150/load | 6h | 4PM(16時の集荷スロットまで) |
 | superrush | Super Rush (5hrs) | +₱200/load | 5h | なし |
 
-- per-load料金の**「load数」はブロック数と同義**(§3.1)。全行のload数合計に料金を掛ける。
-  例: Assorted 14kg = 2ブロック → 24 Hours は +₱140。Blankets 6kg = 2ロード → +₱140。
+- per-load料金の**「load数」はブロック数と同義**。全行のload数合計に料金を掛ける。
+  load数: Assorted・Wash Only・Dry Only・Fold Only = `ceil(kg/12)`(§3.1・§3.3)、
+  Blankets = `ceil(kg/5)`(§3.2)、kg/枚数単価サービス = 1。
+  例: Assorted 14kg = 2ブロック → 24 Hours は +₱140。Wash Only 14kg = 2ブロック → +₱140。
 - **最短デリバリー = 集荷時刻 + hours**。例: 11AM集荷 + Super Rush → 同日16:00スロットから。
 - cutoffを過ぎた集荷時刻ではそのスピードが選択不可(グレーアウト)。選択中に不可となった
   場合は Standard に自動フォールバック(高額オプションへの自動切替はしない)。
