@@ -13,7 +13,7 @@
   - kg単価サービス(210/kg・155/kg)は開始kgごとに切り上げ(1.5kg → 2kg分)
   - 詳細仕様: [docs/laundry_plus_order_form_spec.md](docs/laundry_plus_order_form_spec.md)
   - Wash + Dry + Press: 210 PHP/kg(48–72時間仕上げ)
-  - Single Services: Wash Only 150 / Dry Only 150 / Fold Only 80(各 最大7kg)
+  - Single Services: Assortedと同じ12kgブロック方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg(各ブロック7kgまでbase、超過は切り上げ/kg、12kgでリセット)
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
 - **Separate load by(洗い分け)**: Whites & Colored / Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(金額は店頭確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
