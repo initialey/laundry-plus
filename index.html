@@ -802,7 +802,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 // ===== Pricing master (sync with GAS sheet later) =====
 // model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
-  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, unit: "kg", step: 0.5, max: 20, def: 7, tag: "₱240/load up to 7kg, +₱45/kg" },
+  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 up to 7kg +₱45/kg, per 12kg load" },
   { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 per 5kg load" },
   { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
   { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, unit: "kg", step: 0.5, max: 7,  def: 7, tag: "₱150/load, max 7kg" },
@@ -945,30 +945,50 @@ document.getElementById("addLoad").addEventListener("click", () => addLoadRow())
 document.getElementById("speeds").addEventListener("change", updateTotals);
 
 function loadPrice(t, qty) {
-  if (t.model === "rate") return Math.round(t.rate * qty);
+  // per-kg rates charge every started kg (same ceil rule as assorted excess)
+  if (t.model === "rate") return t.unit === "kg" ? t.rate * Math.ceil(qty) : Math.round(t.rate * qty);
+  // assorted: split into 12kg blocks; each block = ₱240 for the first 7kg,
+  // then +₱45 per started kg (block max = 240 + 5×45 = ₱465)
+  if (t.blockKg) {
+    let total = 0, remaining = qty;
+    while (remaining > 0) {
+      const block = Math.min(remaining, t.blockKg);
+      total += t.base + Math.max(0, Math.ceil(block - t.includedKg)) * t.extraPerKg;
+      remaining -= block;
+    }
+    return total;
+  }
   // every started block of loadKg counts as another full load (e.g. towels: 6kg = 2 loads)
   if (t.loadKg) return t.base * Math.ceil(qty / t.loadKg);
   let price = t.base;
   if (t.extraPerKg && qty > t.includedKg) price += Math.ceil(qty - t.includedKg) * t.extraPerKg;
   return price;
 }
+// how many machine loads a row occupies — per-load fees (speed, add-ons) scale by this
+function loadUnitsOf(t, qty) {
+  if (t.blockKg) return Math.ceil(qty / t.blockKg);
+  if (t.loadKg) return Math.ceil(qty / t.loadKg);
+  return 1;
+}
 function collectLoads() {
   return [...loadsEl.querySelectorAll(".load")].map(row => {
     const t = LOAD_TYPES[+row.querySelector("select").value];
     let qty = parseFloat(row.querySelector("input").value) || t.def;
     qty = Math.min(t.max, Math.max(t.step, qty));
-    return { type: t.id, label: t.label, qty, unit: t.unit, amount: loadPrice(t, qty) };
+    return { type: t.id, label: t.label, qty, unit: t.unit, units: loadUnitsOf(t, qty), amount: loadPrice(t, qty) };
   });
 }
 function computeTotals() {
   const loads = collectLoads();
   const fee = +document.querySelector("input[name=speed]:checked").dataset.fee;
+  // "per load" = per machine load: a 14kg assorted row is 2 loads (12kg blocks)
+  const totalUnits = loads.reduce((s, l) => s + l.units, 0);
   const subLoads = loads.reduce((s, l) => s + l.amount, 0);
-  const subSpeed = fee * loads.length;
+  const subSpeed = fee * totalUnits;
   const subAddons = [...document.querySelectorAll("input[name=addon]:checked")]
     .reduce((s, el) => {
       const a = ADDONS.find(x => x.id === el.value);
-      return s + (a.per === "load" ? a.fee * loads.length : a.fee);
+      return s + (a.per === "load" ? a.fee * totalUnits : a.fee);
     }, 0);
   return { loads, subLoads, subSpeed, subAddons, total: subLoads + subSpeed + subAddons };
 }
