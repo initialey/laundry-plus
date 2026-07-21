@@ -25,6 +25,7 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { overflow-x: hidden; }
+.nowrap { white-space: nowrap; }
 
 body {
   font-family: var(--body);
@@ -448,6 +449,18 @@ select {
 .speed input:disabled + span { opacity: .45; cursor: not-allowed; }
 /* recommended separation option: soft highlight (checked style still wins) */
 .speed.recommend > span { border-color: var(--yellow); background: #fffcf0; }
+.speed .recbadge {
+  display: inline-block;
+  margin: 3px 0 1px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--yellow-deep);
+  background: #fff6d6;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
 .speed input:checked + span .fee { color: var(--yellow-deep); }
 .speed input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
 
@@ -823,8 +836,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 </main>
 </div>
 
-<footer>LAUNDRY+ ・ OPEN DAILY 5AM–11PM<br>
-<span class="fsub">PICKUP &amp; DELIVERY — WEEKDAYS 8AM–9PM ・ WEEKENDS 9AM–7PM</span></footer>
+<footer><span class="nowrap">LAUNDRY+ ・ OPEN DAILY 5AM–11PM</span><br>
+<span class="fsub">PICKUP &amp; DELIVERY — <span class="nowrap">WEEKDAYS 8AM–9PM</span> ・ <span class="nowrap">WEEKENDS 9AM–7PM</span></span></footer>
 
 <script>
 // ===== Pricing master (sync with GAS sheet later) =====
@@ -869,7 +882,7 @@ const ADDONS = [
 // `label` is also the value recorded in the sheet — keep it clean; display
 // extras (star, notes) live in `mark`/`note`.
 const SEPARATION = [
-  { id: "whites",     label: "Whites & Colored",   mark: " ⭐ (Our Recommendation)", recommended: true, note: "Whites washed separately from colored" },
+  { id: "whites",     label: "Whites & Colored",   mark: "⭐ Our Recommendation", recommended: true, note: "Whites washed separately from colored" },
   { id: "bedclothes", label: "Beddings & Clothes", note: "Beddings washed separately from clothes" },
   { id: "bedtowels",  label: "Beddings & Towels",  note: "Beddings washed separately from towels" },
   { id: "perbag",     label: "Per Bag",            note: "Each bag washed separately" },
@@ -889,7 +902,7 @@ document.getElementById("bango").innerHTML = BANGO.map(b => `
 document.getElementById("separation").innerHTML = SEPARATION.map(s => `
   <label class="speed${s.recommended ? " recommend" : ""}">
     <input type="radio" name="separation" value="${s.label}" ${s.id === "mixed" ? "checked" : ""}>
-    <span><span class="nm">${s.label}${s.mark || ""}<small>${s.note}</small></span>
+    <span><span class="nm">${s.label}${s.mark ? `<span class="recbadge">${s.mark}</span>` : ""}<small>${s.note}</small></span>
     <span class="fee">${s.free ? "FREE" : "Additional Charge"}</span></span>
   </label>`).join("");
 
