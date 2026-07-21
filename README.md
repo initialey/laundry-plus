@@ -16,7 +16,7 @@
   - Single Services: Assortedと同じ12kgブロック方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg(各ブロック7kgまでbase、超過は切り上げ/kg、12kgでリセット)
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
-- **Separate load by(洗い分け)**: Whites & Colored / Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(金額は店頭確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
+- **Separate Laundry Option or Preference(洗い分け)**: Whites & Colored(⭐おすすめ・ハイライト表示)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(追加料金はスタッフが受取時に確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
 - **Add-ons**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)
 - **T&C同意**: 送信前に免責事項(EN+TL、アコーディオン表示)への同意が必須。未チェックでは送信ボタン無効。同意時刻をシートに記録
 - **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load・締切12NN)/ Super Rush 5hrs(+200/load・締切2PM)

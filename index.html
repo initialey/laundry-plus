@@ -446,6 +446,8 @@ select {
   box-shadow: 0 3px 0 rgba(245,184,32,.35);
 }
 .speed input:disabled + span { opacity: .45; cursor: not-allowed; }
+/* recommended separation option: soft highlight (checked style still wins) */
+.speed.recommend > span { border-color: var(--yellow); background: #fffcf0; }
 .speed input:checked + span .fee { color: var(--yellow-deep); }
 .speed input:focus-visible + span { box-shadow: 0 0 0 3px rgba(63,180,230,.4); }
 
@@ -731,13 +733,13 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">4</span>Separate load by</h2>
+      <h2><span class="step">4</span>Separate Laundry Option or Preference</h2>
       <div class="speeds" id="separation"></div>
       <div class="field" id="bagCountField" style="display:none; margin-top:10px">
         <label class="lbl" for="bagCount">No. of Bags<span class="req">*</span></label>
         <input type="number" id="bagCount" name="bagCount" min="1" max="30" step="1" placeholder="e.g. 3" inputmode="numeric" data-err="Please enter how many bags.">
       </div>
-      <p class="hint">Additional charges will apply for separated washing — confirmed at the shop.</p>
+      <p class="hint">Any additional fees will be confirmed by our staff upon receiving your laundry.</p>
     </section>
 
     <section class="card">
@@ -864,12 +866,14 @@ const ADDONS = [
   { id: "bag",       label: "Laundry+ Bag",    fee: 200, per: "order" },
 ];
 // How the customer wants their laundry separated (extra charges confirmed in-store)
+// `label` is also the value recorded in the sheet — keep it clean; display
+// extras (star, notes) live in `mark`/`note`.
 const SEPARATION = [
-  { id: "whites",     label: "Whites & Colored",   note: "Whites washed separately from colored" },
+  { id: "whites",     label: "Whites & Colored",   mark: " ⭐ (Our Recommendation)", recommended: true, note: "Whites washed separately from colored" },
   { id: "bedclothes", label: "Beddings & Clothes", note: "Beddings washed separately from clothes" },
   { id: "bedtowels",  label: "Beddings & Towels",  note: "Beddings washed separately from towels" },
   { id: "perbag",     label: "Per Bag",            note: "Each bag washed separately" },
-  { id: "mixed",      label: "Mixed",              note: "Everything washed together", free: true },
+  { id: "mixed",      label: "Mixed",              note: "Everything washed together<br>Assorted loads may include UP TO 2KG of towels, jeans, or bedding.", free: true },
 ];
 
 const php = n => "₱" + n.toLocaleString("en-PH");
@@ -883,9 +887,9 @@ document.getElementById("bango").innerHTML = BANGO.map(b => `
   </label>`).join("");
 
 document.getElementById("separation").innerHTML = SEPARATION.map(s => `
-  <label class="speed">
+  <label class="speed${s.recommended ? " recommend" : ""}">
     <input type="radio" name="separation" value="${s.label}" ${s.id === "mixed" ? "checked" : ""}>
-    <span><span class="nm">${s.label}<small>${s.note}</small></span>
+    <span><span class="nm">${s.label}${s.mark || ""}<small>${s.note}</small></span>
     <span class="fee">${s.free ? "FREE" : "Additional Charge"}</span></span>
   </label>`).join("");
 
