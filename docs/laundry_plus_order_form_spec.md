@@ -110,9 +110,13 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
 ## §4 Bango / Separate load by / Add-ons
 
 - **Bango Level**(香り): None / Less / Normal(デフォルト・推奨)/ Extra / Ultra
-- **Separate load by**(洗い分け): Whites & Colored / Beddings & Clothes / Beddings & Towels /
-  Per Bag / Mixed(デフォルト・無料)。Mixed以外は Additional Charge(店頭確認)。
-  Per Bag 選択時は **No. of Bags が必須**になり、「Per Bag × N bags」として記録。
+- **Separate Laundry Option or Preference**(洗い分け): Whites & Colored / Beddings & Clothes /
+  Beddings & Towels / Per Bag / Mixed(デフォルト・無料)。Mixed以外は Additional Charge 表示。
+  - Whites & Colored は「⭐ (Our Recommendation)」表記+カードを黄色系にハイライト(おすすめ)
+  - Mixed の補足: "Assorted loads may include UP TO 2KG of towels, jeans, or bedding."
+  - セクション下部の注記: "Any additional fees will be confirmed by our staff upon receiving your laundry."
+  - Per Bag 選択時は **No. of Bags が必須**になり、「Per Bag × N bags」として記録。
+    シートに記録される値は素のラベル(例: "Whites & Colored")で、⭐等の装飾は含まない。
 - **Add-ons**: Bleach +₱20/load、Extra Detergent +₱10/load(いずれもload数×料金。load数は§3の定義)、
   Laundry+ Bag +₱200(注文につき1回)
 
