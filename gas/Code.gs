@@ -7,9 +7,9 @@
 // Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
 //
 // NOTE: the column layout changed (FB / Contact Via / Pickup / Delivery /
-// Add-ons / Preferences were added). If you already have an "Orders" sheet
-// from an older version, rename it (e.g. "Orders-old") and run setupSheet()
-// again so new orders land under the right headers.
+// Separation / Add-ons / T&C Agreed were added). If you already have an
+// "Orders" sheet from an older version, rename it (e.g. "Orders-old") and
+// run setupSheet() again so new orders land under the right headers.
 
 // ===== Telegram settings =====
 const TELEGRAM_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"; // from @BotFather
@@ -26,7 +26,7 @@ const SHEET_NAME = "Orders";
 const HEADERS = [
   "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
-  "Preferences", "Speed", "Notes", "Total (PHP)",
+  "T&C Agreed", "Speed", "Notes", "Total (PHP)",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -52,7 +52,6 @@ function doPost(e) {
     .map(function (l) { return l.label + " " + (l.qty || l.kg) + (l.unit || "kg") + " = P" + l.amount; })
     .join("\n");
   const addonsText = (data.addons || []).join("\n");
-  const prefsText = (data.prefs || []).join("\n");
 
   sheet.appendRow([
     data.receiptNo,
@@ -71,7 +70,7 @@ function doPost(e) {
     data.bango,
     data.separation || "",
     addonsText,
-    prefsText,
+    data.tncAgreedAt ? new Date(data.tncAgreedAt) : "", // T&C agreement timestamp
     data.speed,
     data.notes,
     data.total,
@@ -91,7 +90,6 @@ function doPost(e) {
       "🌸 Bango: " + data.bango + " / ⏱ " + data.speed + "\n" +
       "🧦 Separation: " + (data.separation || "-") +
       (addonsText ? "\n➕ " + (data.addons || []).join(", ") : "") +
-      (prefsText ? "\n✅ " + (data.prefs || []).join(", ") : "") +
       (data.notes ? "\n📝 " + data.notes : "") + "\n" +
       "💰 Total: P" + data.total + " (estimate)"
     );

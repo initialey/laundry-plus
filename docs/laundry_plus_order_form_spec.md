@@ -77,7 +77,7 @@ while remaining > 0:
 - 枚数単価: Tops ₱40 / Bottoms ₱55 / Simple Dress ₱80 / Long Dress ₱105 / Jacket ₱105 /
   Hanger w/ Dust Bag ₱20(整数枚)
 
-## §4 Bango / Separate load by / Add-ons / Preferences
+## §4 Bango / Separate load by / Add-ons
 
 - **Bango Level**(香り): None / Less / Normal(デフォルト・推奨)/ Extra / Ultra
 - **Separate load by**(洗い分け): Whites & Colored / Beddings & Clothes / Beddings & Towels /
@@ -85,7 +85,15 @@ while remaining > 0:
   Per Bag 選択時は **No. of Bags が必須**になり、「Per Bag × N bags」として記録。
 - **Add-ons**: Bleach +₱20/load、Extra Detergent +₱10/load(いずれもload数×料金。load数は§3の定義)、
   Laundry+ Bag +₱200(注文につき1回)
-- **Preferences**(チェック): デリケート品・手洗い品の有無 / 色落ちしそうな物の有無
+
+### §4.1 Terms & Conditions 同意(必須)
+
+- 送信ボタン直前に **T&C同意チェックボックス**を配置。チェックするまで送信ボタンは disabled。
+- T&C本文は折りたたみ(アコーディオン)で英語+タガログ語を併記:
+  色落ち・縮み・デリケート/ラベルなし生地の損傷について Laundry+ は免責、予約により
+  標準的な洗濯処理に安全な品であることを確認したものとする。
+- 同意時刻を `tncAgreedAt`(ISO)として送信し、Ordersシートの **「T&C Agreed」列**にタイムスタンプ記録。
+- 旧「Preferences」チェック(デリケート品/色落ち)は廃止。
 
 ## §5 スピードオプション
 

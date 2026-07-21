@@ -393,6 +393,28 @@ select {
 }
 .check:has(input:checked) { border-color: var(--pink); background: #fdf1f7; }
 
+/* ── T&C agreement ── */
+.tnccard { padding: 16px; }
+.tnc { margin-top: 10px; }
+.tnc summary {
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--sky-deep);
+  cursor: pointer;
+  user-select: none;
+}
+.tnc p {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ink-deep);
+  background: #eef8fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.submit:disabled { opacity: .55; cursor: not-allowed; }
+
 /* ── speed options ── */
 .speeds { display: flex; flex-direction: column; gap: 8px; }
 .speed { position: relative; }
@@ -717,18 +739,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">5</span>Add-ons &amp; Preferences</h2>
+      <h2><span class="step">5</span>Add-ons</h2>
       <div class="checks" id="addons"></div>
-      <div class="checks">
-        <label class="check">
-          <input type="checkbox" name="pref" value="Has delicate / hand-wash items">
-          <span>Any delicate or hand-wash items?</span>
-        </label>
-        <label class="check">
-          <input type="checkbox" name="pref" value="Items may bleed color">
-          <span>Any items that may bleed color?</span>
-        </label>
-      </div>
     </section>
 
     <section class="card">
@@ -776,7 +788,19 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="estnote">⚠️ All prices shown are <b>estimates only</b>. Your final price is determined at the shop after your laundry arrives and is weighed.</div>
     </div>
 
-    <button type="submit" class="submit" id="submitBtn">Book for Pickup 🧺</button>
+    <div class="card tnccard">
+      <label class="check">
+        <input type="checkbox" id="tncAgree">
+        <span>I have read and agree to the Terms &amp; Conditions below.</span>
+      </label>
+      <details class="tnc">
+        <summary>Terms &amp; Conditions (English / Tagalog)</summary>
+        <p>"Laundry+ is not liable for color bleeding, shrinkage, or damage to delicate/unlabeled fabrics during washing, drying, or pressing. By booking, you confirm your items are safe for standard laundry processing."</p>
+        <p lang="tl">"Hindi mananagot ang Laundry+ sa pagbleed ng kulay, pag-shrink, o pagkasira ng delicate/walang label na damit sa proseso ng paglaba, pagdry, o pagpress. Sa pag-book, kinukumpirma mo na safe ang mga gamit mo para sa standard laundry processing."</p>
+      </details>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn" disabled>Book for Pickup 🧺</button>
     <p class="note">* Prices are estimates. Final amount is confirmed after weighing in-store.</p>
   </form>
 
@@ -1183,7 +1207,6 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const a = ADDONS.find(x => x.id === el.value);
     return `${a.label} (+₱${a.fee}${a.per === "load" ? "/load" : ""})`;
   });
-  const prefs = [...document.querySelectorAll("input[name=pref]:checked")].map(el => el.value);
   const payload = {
     receiptNo: rcpt,
     receivedAt: now.toISOString(),
@@ -1201,9 +1224,9 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
       return s === "Per Bag" ? `Per Bag × ${parseInt(bagCount.value, 10)} bags` : s;
     })(),
     addons,
-    prefs,
     speed: speed.value,
     notes: form.notes.value.trim(),
+    tncAgreedAt: new Date().toISOString(),
     total,
   };
 
@@ -1220,9 +1243,15 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     alert("Something went wrong. Please try again.");
     console.error(err);
   } finally {
-    btn.disabled = false;
+    btn.disabled = !tncAgree.checked;
     btn.textContent = "Book for Pickup 🧺";
   }
+});
+
+// submit stays locked until the Terms & Conditions are accepted
+const tncAgree = document.getElementById("tncAgree");
+tncAgree.addEventListener("change", () => {
+  document.getElementById("submitBtn").disabled = !tncAgree.checked;
 });
 
 document.getElementById("againBtn").addEventListener("click", () => location.reload());
