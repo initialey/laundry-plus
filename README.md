@@ -8,7 +8,10 @@
 ## 機能
 
 - **Loads**: サービスと数量(kgまたは枚数)を入れると自動で料金計算
-  - Wash + Dry + Fold: Assorted 240 PHP/load(7kgまで、超過 +45 PHP/kg)/ Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
+  - Wash + Dry + Fold: Assorted は12kgブロック方式 — 12kgごとのブロックに分割し、各ブロック=最初の7kgまで240 PHP+超過分45 PHP/kg(切り上げ、ブロック最大465 PHP)。例: 14kg = 465+240 = 705 PHP。Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
+  - per-load料金(スピード・Bleach等)の「load数」はブロック数(Assorted: ceil(kg/12)、Blankets: ceil(kg/5))
+  - kg単価サービス(210/kg・155/kg)は開始kgごとに切り上げ(1.5kg → 2kg分)
+  - 詳細仕様: [docs/laundry_plus_order_form_spec.md](docs/laundry_plus_order_form_spec.md)
   - Wash + Dry + Press: 210 PHP/kg(48–72時間仕上げ)
   - Single Services: Wash Only 150 / Dry Only 150 / Fold Only 80(各 最大7kg)
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
