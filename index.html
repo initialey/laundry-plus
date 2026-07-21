@@ -414,6 +414,29 @@ select {
   border-radius: 10px;
   padding: 10px 12px;
 }
+.tncprompt {
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--ink-deep);
+  background: #fff9e6;
+  border: 2px solid var(--yellow);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.tncprompt span[lang="tl"] { color: #6aa9c9; font-weight: 600; }
+.linklike {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: var(--sky-deep);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.linklike:hover { color: var(--pink); }
 .submit:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ── speed options ── */
@@ -813,9 +836,11 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       </label>
       <details class="tnc">
         <summary>Terms &amp; Conditions (English / Tagalog)</summary>
-        <p>"Laundry+ is not liable for color bleeding, shrinkage, or damage to delicate/unlabeled fabrics during washing, drying, or pressing. By booking, you confirm your items are safe for standard laundry processing."</p>
-        <p lang="tl">"Hindi mananagot ang Laundry+ sa pagbleed ng kulay, pag-shrink, o pagkasira ng delicate/walang label na damit sa proseso ng paglaba, pagdry, o pagpress. Sa pag-book, kinukumpirma mo na safe ang mga gamit mo para sa standard laundry processing."</p>
+        <p>"Laundry+ is not liable for color bleeding, shrinkage, fading, or damage to delicate or unlabeled garments resulting from standard washing, drying, or pressing. By booking, you confirm that your items are suitable for standard laundry processing unless special handling is requested."</p>
+        <p lang="tl">"Hindi mananagot ang Laundry+ sa pagbleed ng kulay, pag-shrink, pagkupas, o pagkasira ng delicate o walang label na damit dulot ng standard na paglaba, pagdry, o pagpress. Sa pag-book, kinukumpirma mo na angkop ang mga gamit mo para sa standard laundry processing maliban kung humingi ka ng special handling."</p>
       </details>
+      <p class="tncprompt">Have delicate items (silk, embellished, hand-wash only, etc.)? <button type="button" class="linklike" id="gotoNotes">Let us know in the notes above</button> so we can give them special care.<br>
+      <span lang="tl">May delicate items ka ba (silk, may beads/embellishments, hand-wash only, etc.)? <button type="button" class="linklike" id="gotoNotesTl">Isulat sa notes</button> para maalagaan namin ng maayos.</span></p>
     </div>
 
     <button type="submit" class="submit" id="submitBtn" disabled>Book for Pickup 🧺</button>
@@ -1302,6 +1327,15 @@ const tncAgree = document.getElementById("tncAgree");
 tncAgree.addEventListener("change", () => {
   document.getElementById("submitBtn").disabled = !tncAgree.checked;
 });
+
+// Delicate-items prompt → jump to the notes field so they can flag it
+function focusNotes() {
+  const notes = document.getElementById("notes");
+  notes.scrollIntoView({ behavior: "smooth", block: "center" });
+  notes.focus({ preventScroll: true });
+}
+document.getElementById("gotoNotes").addEventListener("click", focusNotes);
+document.getElementById("gotoNotesTl").addEventListener("click", focusNotes);
 
 document.getElementById("againBtn").addEventListener("click", () => location.reload());
 
