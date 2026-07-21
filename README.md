@@ -19,12 +19,12 @@
 - **Separate Laundry Option or Preference(洗い分け)**: Whites & Colored(⭐おすすめ・ハイライト表示)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(追加料金はスタッフが受取時に確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
 - **Add-ons**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)
 - **T&C同意**: 送信前に免責事項(EN+TL、アコーディオン表示)への同意が必須。未チェックでは送信ボタン無効。同意時刻をシートに記録
-- **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load・締切12NN)/ Super Rush 5hrs(+200/load・締切2PM)
-- **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と1時間スロットを選択
-  - 集配時間: 平日 8AM–9PM / 週末 9AM–7PM(営業時間は毎日 5AM–11PM)
-  - デリバリー日時はスピードに連動: 最短デリバリー = ピックアップ時刻 + 仕上がり時間(Standard=48h / 24 Hours=24h / Rush=6h / Super Rush=5h)。例: 11AMピックアップ + Super Rush → 最短4PMデリバリー
-  - Rush(Same Day)はピックアップ4PMまで(`cutoff: 16`)。それ以降のピックアップではRushが選択不可になり、選択中だった場合はStandardに戻る(Super Rushは選択可)
-  - スロットは GAS 側で1時間あたりの件数を制限(`SLOT_CAP`、デフォルト2件)。満枠・ブロック済みスロットは FULL 表示で選択不可
+- **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load)/ Super Rush 5hrs(+200/load)
+- **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と**固定時間スロット**を選択(営業時間は毎日 5AM–11PM)
+  - 固定スロット(全曜日共通・7枠+特別枠): 8:00–9:00 / 9:00–10:30 / 11:00–12:30 / 1:00–2:30 / 3:00–4:30 / 5:00–6:30 / 7:00–8:30 ＋ 9:00 PM(最終枠・⚠️Limited)
+  - Standard=集荷2日後以降 / 24 Hours=翌日以降、いずれも全スロット自由選択
+  - **Rush / Super Rush は当日配達**で、選べる配達枠は集荷時刻に応じた固定対応表で決まる(詳細は仕様書§6.1)。該当枠が無い遅い集荷は「Lalamove(customer arranges/pays)」案内に切替
+  - スロットは GAS 側で1枠あたりの件数を制限(`SLOT_CAP`、デフォルト2件)。満枠・ブロック済みスロットは FULL 表示で選択不可
 - **連絡先**: Facebook アカウント欄と希望連絡手段(SMS / Messenger)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
 

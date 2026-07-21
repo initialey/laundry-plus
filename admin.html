@@ -178,12 +178,18 @@ const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwngDiaWySIxwaZ6Uk
 
 const pad = n => String(n).padStart(2, "0");
 const toISODate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const fmtHour = h => `${((h + 11) % 12) + 1}:00 ${h >= 12 ? "PM" : "AM"}`;
 const fmtDate = d => d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-// same rider hours as the booking form
-const slotHours = d => (d.getDay() === 0 || d.getDay() === 6)
-  ? { start: 9, end: 19 }   // weekend: 9AM–7PM
-  : { start: 8, end: 21 };  // weekday: 8AM–9PM
+// same fixed slot windows as the booking form
+const SLOTS = [
+  { v: "08:00", label: "8:00–9:00 AM" },
+  { v: "09:00", label: "9:00–10:30 AM" },
+  { v: "11:00", label: "11:00–12:30 PM" },
+  { v: "13:00", label: "1:00–2:30 PM" },
+  { v: "15:00", label: "3:00–4:30 PM" },
+  { v: "17:00", label: "5:00–6:30 PM" },
+  { v: "19:00", label: "7:00–8:30 PM" },
+  { v: "21:00", label: "9:00 PM", special: true },
+];
 
 const keyInput = document.getElementById("key");
 const slotsEl = document.getElementById("slots");
@@ -207,8 +213,7 @@ function esc(s) {
 
 function renderHeader() {
   document.getElementById("curDate").textContent = fmtDate(curDate);
-  const { start, end } = slotHours(curDate);
-  document.getElementById("curHours").textContent = `Rider hours: ${fmtHour(start)} – ${fmtHour(end)}`;
+  document.getElementById("curHours").textContent = `${SLOTS.length} time slots · last slot 9PM (limited)`;
 }
 
 async function load() {
@@ -234,18 +239,17 @@ async function load() {
   }
   if (date !== toISODate(curDate)) return; // user already navigated away
 
-  const { start, end } = slotHours(curDate);
   const cap = data.cap || 2;
   let html = "";
-  for (let h = start; h < end; h++) {
-    const slot = pad(h) + ":00";
+  for (const s of SLOTS) {
+    const slot = s.v;
     const bks = (data.bookings || []).filter(b => b.slot === slot);
     const active = bks.filter(b => b.status !== "CANCELLED").length;
     const blocked = (data.blocked || []).includes(slot);
     const cls = blocked ? "blocked" : (active >= cap ? "full" : "");
     html += `<div class="slot ${cls}">
       <div class="top">
-        <span class="time">${fmtHour(h)} – ${fmtHour(h + 1)}</span>
+        <span class="time">${s.label}${s.special ? " ⚠️" : ""}</span>
         <span class="cnt">${blocked ? "BLOCKED" : `${active}/${cap}${active >= cap ? " FULL" : ""}`}</span>
         <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
       </div>
