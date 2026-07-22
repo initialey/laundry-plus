@@ -7,9 +7,10 @@
 // Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
 //
 // NOTE: the column layout changed (FB / Contact Via / Pickup / Delivery /
-// Separation / Add-ons / T&C Agreed were added). If you already have an
-// "Orders" sheet from an older version, rename it (e.g. "Orders-old") and
-// run setupSheet() again so new orders land under the right headers.
+// Separation / Add-ons / T&C Agreed / Promo Code / Discount were added).
+// If you already have an "Orders" sheet from an older version, rename it
+// (e.g. "Orders-old") and run setupSheet() again so new orders land under
+// the right headers. setupSheet() also creates the PromoCodes sheet.
 
 // ===== Telegram settings =====
 const TELEGRAM_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"; // from @BotFather
@@ -26,7 +27,7 @@ const SHEET_NAME = "Orders";
 const HEADERS = [
   "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
-  "T&C Agreed", "Speed", "Notes", "Total (PHP)",
+  "T&C Agreed", "Speed", "Notes", "Promo Code", "Discount", "Total (PHP)",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -38,9 +39,16 @@ const SLOT_CAP = 2;
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
 const BLOCKED_SHEET = "BlockedSlots";
 
+// Promo codes (managed from admin.html). Columns: Code / Type / Value /
+// Valid Until / Active / Notes. Type is "percent" (Value = % off) or
+// "fixed" (Value = ₱ off). Valid Until is inclusive; blank = no expiry.
+const PROMO_SHEET = "PromoCodes";
+const PROMO_HEADERS = ["Code", "Type", "Value", "Valid Until", "Active", "Notes"];
+
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   if (data.action === "block") return handleBlock(data); // from admin.html
+  if (data.action === "promo") return handlePromo(data); // from admin.html
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -73,6 +81,8 @@ function doPost(e) {
     data.tncAgreedAt ? new Date(data.tncAgreedAt) : "", // T&C agreement timestamp
     data.speed,
     data.notes,
+    data.promoCode || "",
+    data.discount || 0,
     data.total,
   ]);
 
@@ -90,7 +100,8 @@ function doPost(e) {
       "🌸 Bango: " + data.bango + " / ⏱ " + data.speed + "\n" +
       "🧦 Separation: " + (data.separation || "-") +
       (addonsText ? "\n➕ " + (data.addons || []).join(", ") : "") +
-      (data.notes ? "\n📝 " + data.notes : "") + "\n" +
+      (data.notes ? "\n📝 " + data.notes : "") +
+      (data.promoCode ? "\n🎟 Promo: " + data.promoCode + " (−P" + (data.discount || 0) + ")" : "") + "\n" +
       "💰 Total: P" + data.total + " (estimate)"
     );
   } catch (err) {
@@ -136,6 +147,17 @@ function doGet(e) {
       });
     });
     return jsonOut({ ok: true, cap: SLOT_CAP, blocked: getBlocked(p.date), bookings: bookings });
+  }
+
+  // Public: validate a promo code entered on the booking form.
+  if (p.action === "promo" && p.code) {
+    return jsonOut(validatePromo(p.code));
+  }
+
+  // Admin: list all promo codes for admin.html.
+  if (p.action === "promos") {
+    if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+    return jsonOut({ ok: true, promos: readPromos() });
   }
 
   return jsonOut({ ok: true });
@@ -203,6 +225,102 @@ function handleBlock(data) {
   return jsonOut({ ok: true, blocked: getBlocked(data.date) });
 }
 
+// ===== Promo codes =====
+function getPromoSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PROMO_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(PROMO_SHEET);
+    sheet.appendRow(PROMO_HEADERS);
+  }
+  return sheet;
+}
+
+function promoToISO(v) {
+  if (!v) return "";
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  return String(v).slice(0, 10); // already "YYYY-MM-DD"
+}
+
+function promoTruthy(v) {
+  const s = String(v).toUpperCase();
+  return v === true || s === "TRUE" || s === "YES" || s === "1" || s === "✓";
+}
+
+// Returns [{ code, type, value, validUntil, active, notes }]
+function readPromos() {
+  const sheet = getPromoSheet();
+  const out = [];
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, PROMO_HEADERS.length).getValues().forEach(function (r) {
+      if (!String(r[0]).trim()) return;
+      out.push({
+        code: String(r[0]).trim().toUpperCase(),
+        type: String(r[1]).trim().toLowerCase() === "fixed" ? "fixed" : "percent",
+        value: Number(r[2]) || 0,
+        validUntil: promoToISO(r[3]),
+        active: promoTruthy(r[4]),
+        notes: String(r[5] || ""),
+      });
+    });
+  }
+  return out;
+}
+
+// Public validation used by the booking form.
+function validatePromo(codeRaw) {
+  const code = String(codeRaw).trim().toUpperCase();
+  const promo = readPromos().filter(function (p) { return p.code === code; })[0];
+  if (!promo) return { ok: false, reason: "Code not found." };
+  if (!promo.active) return { ok: false, reason: "This code is no longer active." };
+  if (promo.validUntil) {
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    if (promo.validUntil < today) return { ok: false, reason: "This code has expired." };
+  }
+  return { ok: true, code: promo.code, type: promo.type, value: promo.value, validUntil: promo.validUntil };
+}
+
+// POST { action:"promo", key, op:"save"|"delete"|"toggle", code, type, value, validUntil, active }
+function handlePromo(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  const sheet = getPromoSheet();
+  const code = String(data.code || "").trim().toUpperCase();
+  if (!code) return jsonOut({ ok: false, error: "missing code" });
+
+  // find existing row (1-based, header on row 1)
+  let rowNum = -1;
+  if (sheet.getLastRow() > 1) {
+    const codes = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < codes.length; i++) {
+      if (String(codes[i][0]).trim().toUpperCase() === code) { rowNum = i + 2; break; }
+    }
+  }
+
+  if (data.op === "delete") {
+    if (rowNum > 0) sheet.deleteRow(rowNum);
+  } else if (data.op === "toggle") {
+    if (rowNum > 0) {
+      const cur = promoTruthy(sheet.getRange(rowNum, 5).getValue());
+      sheet.getRange(rowNum, 5).setValue(!cur);
+    }
+  } else { // save (upsert)
+    const type = String(data.type).toLowerCase() === "fixed" ? "fixed" : "percent";
+    const row = [
+      "'" + code,
+      type,
+      Number(data.value) || 0,
+      data.validUntil ? "'" + String(data.validUntil).slice(0, 10) : "",
+      data.active === false ? false : true,
+      data.notes || "",
+    ];
+    if (rowNum > 0) sheet.getRange(rowNum, 1, 1, PROMO_HEADERS.length).setValues([row]);
+    else sheet.appendRow(row);
+  }
+  return jsonOut({ ok: true, promos: readPromos() });
+}
+
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
@@ -226,6 +344,13 @@ function setupSheet() {
   if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS);
   sheet.setFrozenRows(1);
   getBlockedSheet(); // create the BlockedSlots sheet too
+
+  // PromoCodes sheet with a disabled example row so the format is clear
+  const promo = getPromoSheet();
+  if (promo.getLastRow() === 1) {
+    promo.appendRow(["'WELCOME50", "fixed", 50, "", false, "Example: ₱50 off (inactive)"]);
+  }
+  promo.setFrozenRows(1);
 
   const statusRange = sheet.getRange("C2:C1000");
   statusRange.setDataValidation(

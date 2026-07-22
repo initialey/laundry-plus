@@ -19,6 +19,7 @@
 - **Separate Laundry Option or Preference(洗い分け)**: Whites & Colored(⭐おすすめ・ハイライト表示)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(追加料金はスタッフが受取時に確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
 - **Add-ons**: Bleach(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Laundry+ Bag(+200 PHP)
 - **T&C同意**: 送信前に免責事項(EN+TL、アコーディオン表示)への同意が必須。未チェックでは送信ボタン無効。同意時刻をシートに記録
+- **プロモコード**: 合計欄でコード入力→Apply で GAS 検証(%オフ / ₱オフ、有効期限・有効フラグ対応)。割引を合計に反映し、コード・割引額をシートに記録。コードは admin.html の Promo Codes パネルで管理(追加/更新・ON/OFF・削除、PromoCodesシートに保存)
 - **スピード**: Standard 48hrs(無料)/ 24 Hours(+70/load)/ Rush 同日(+150/load)/ Super Rush 5hrs(+200/load)
 - **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と**固定時間スロット**を選択(営業時間は毎日 5AM–11PM)
   - 固定スロット(全曜日共通・7枠+特別枠): 8:00–9:00 / 9:00–10:30 / 11:00–12:30 / 1:00–2:30 / 3:00–4:30 / 5:00–6:30 / 7:00–8:30 ＋ 9:00 PM(最終枠・⚠️Limited)

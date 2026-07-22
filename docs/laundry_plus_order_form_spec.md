@@ -131,6 +131,20 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
   Step 8 の自由記入欄(#notes)へスクロール+フォーカスする導線とする。
 - 旧「Preferences」チェック(デリケート品/色落ち)は廃止。
 
+### §4.2 プロモコード
+
+- 合計カード内に **Promo Code 入力欄 + Apply ボタン**。Applyで GAS
+  `GET ?action=promo&code=` に問い合わせて検証。
+- 割引タイプ2種: **percent(%オフ)** / **fixed(₱オフ)**。有効期限(Valid Until、含む日まで)と
+  有効/無効(Active)を持つ。無効・期限切れ・未登録は理由付きで拒否。
+- 割引額 = percent: `round(gross × value/100)` / fixed: `min(value, gross)`
+  (gross = loads + speed + add-ons)。合計は `gross − discount`(₱0未満にはならない)。
+- ロード・スピード・アドオンを変更すると割引も自動再計算。コード欄を編集すると適用は解除。
+- 送信データに `promoCode` と `discount` を含め、Ordersシートの **「Promo Code」「Discount」列**に記録。
+- **管理は admin.html の Promo Codes パネル**で行う(コード追加/更新、ON/OFF、削除)。
+  コードは Google スプレッドシートの **PromoCodes シート**(Code / Type / Value / Valid Until /
+  Active / Notes)に保存。同名コードは上書き。
+
 ## §5 スピードオプション
 
 | ID | 表示 | 追加料金 | デリバリー |
@@ -197,3 +211,5 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
 - 注文POST → 「Orders」シートに記録(Status列でNEW→WASHING→READY→PICKED UP/CANCELLEDを管理)+Telegram通知。
 - **料金計算はフォーム(index.html)側のみ**で行い、GASは `total` を記録するだけ(計算ロジックの二重管理をしない)。
 - `GET ?action=slots&date=` … スロット空き状況(公開)/ `GET ?action=day&date=&key=` … 管理画面用の予約一覧(要ADMIN_KEY)/ `POST {action:"block"}` … スロットのBLOCK/UNBLOCK。
+- `GET ?action=promo&code=` … プロモコード検証(公開)/ `GET ?action=promos&key=` … コード一覧(要ADMIN_KEY)/ `POST {action:"promo", op:"save"|"toggle"|"delete"}` … コード管理。PromoCodesシートに保存。
+- `setupSheet()` は Orders / BlockedSlots / PromoCodes の各シートを作成。

@@ -135,6 +135,38 @@ button.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow
 .msg.err { color: var(--red); }
 .legend { font-size: 11px; font-weight: 700; color: #6aa9c9; margin-top: 10px; text-align: center; }
 footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: .12em; opacity: .9; padding-top: 8px; }
+.promohead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.promohead h2 { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--sky-deep); }
+.promoform { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.pf-row { display: flex; gap: 8px; align-items: center; }
+.pf-row input, .pf-row select { padding: 9px 10px; }
+.pf-row #pCode { flex: 2; text-transform: uppercase; }
+.pf-row #pType { flex: 1.2; }
+.pf-row #pValue { flex: 1; }
+.pf-lbl { font-size: 11px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.promoform select {
+  font-family: var(--body); font-weight: 700; font-size: 14px; color: var(--ink-deep);
+  background: #eef8fd; border: 2px solid #cdeaf8; border-radius: 12px;
+}
+.promoform > .btn { width: 100%; }
+.promolist { display: flex; flex-direction: column; gap: 8px; }
+.pcode {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border: 2px solid #cdeaf8; border-radius: 12px; padding: 9px 12px;
+}
+.pcode.off { opacity: .55; }
+.pcode.expired { border-color: var(--red); }
+.pcode .c { font-weight: 800; font-size: 14px; color: var(--ink-deep); }
+.pcode .d { font-weight: 700; font-size: 12px; color: var(--sky-deep); }
+.pcode .u { font-size: 11px; font-weight: 700; color: #6aa9c9; }
+.pcode .u.exp { color: var(--red); }
+.pcode .sp { margin-left: auto; display: flex; gap: 6px; }
+.pcode .tgl, .pcode .del {
+  border: 2px solid #cdeaf8; background: transparent; border-radius: 999px;
+  font-family: var(--body); font-weight: 800; font-size: 11px; padding: 4px 11px; cursor: pointer; color: #6aa9c9;
+}
+.pcode .tgl.on { border-color: var(--green); color: var(--green); }
+.pcode .del:hover { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -169,6 +201,30 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
     <div class="legend">Tap BLOCK to close a slot for new bookings (shows as FULL on the form) · UNBLOCK reopens it. Cancelled orders don't count toward the cap.</div>
   </div>
 
+  <div class="card">
+    <div class="promohead">
+      <h2>Promo Codes</h2>
+      <button class="btn today" id="reloadPromos">Reload</button>
+    </div>
+    <div class="promoform">
+      <div class="pf-row">
+        <input type="text" id="pCode" placeholder="CODE" autocapitalize="characters">
+        <select id="pType">
+          <option value="percent">% off</option>
+          <option value="fixed">₱ off</option>
+        </select>
+        <input type="number" id="pValue" placeholder="Value" min="0" step="1">
+      </div>
+      <div class="pf-row">
+        <label class="pf-lbl" for="pUntil">Valid until (optional)</label>
+        <input type="date" id="pUntil">
+      </div>
+      <button class="btn" id="savePromo">Add / Update Code</button>
+    </div>
+    <div class="promolist" id="promoList"><div class="msg">Enter your admin key to load promo codes.</div></div>
+    <div class="legend">Add or update a code (same code overwrites). ON/OFF toggles whether the form accepts it; ✕ deletes it. Expired or OFF codes are rejected on the form.</div>
+  </div>
+
   <footer>LAUNDRY+ ・ ADMIN</footer>
 </div>
 
@@ -201,6 +257,7 @@ keyInput.value = localStorage.getItem("lpAdminKey") || "";
 document.getElementById("saveKey").addEventListener("click", () => {
   localStorage.setItem("lpAdminKey", keyInput.value.trim());
   load();
+  loadPromos();
 });
 keyInput.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("saveKey").click(); });
 document.getElementById("prevDay").addEventListener("click", () => { curDate.setDate(curDate.getDate() - 1); load(); });
@@ -291,7 +348,87 @@ slotsEl.addEventListener("click", async e => {
   }
 });
 
+// ===== Promo codes =====
+const promoListEl = document.getElementById("promoList");
+const todayISO = toISODate(new Date());
+let promoBusy = false;
+
+async function loadPromos() {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { promoListEl.innerHTML = `<div class="msg">Enter your admin key to load promo codes.</div>`; return; }
+  promoListEl.innerHTML = `<div class="msg">Loading…</div>`;
+  let data;
+  try {
+    const res = await fetch(`${GAS_ENDPOINT}?action=promos&key=${encodeURIComponent(key)}`);
+    data = await res.json();
+  } catch (err) {
+    promoListEl.innerHTML = `<div class="msg err">Couldn't reach the server.</div>`; return;
+  }
+  if (!data.ok) { promoListEl.innerHTML = `<div class="msg err">Wrong admin key.</div>`; return; }
+  renderPromos(data.promos || []);
+}
+
+function renderPromos(promos) {
+  if (!promos.length) { promoListEl.innerHTML = `<div class="msg">No promo codes yet. Add one above.</div>`; return; }
+  promoListEl.innerHTML = promos.map(p => {
+    const expired = p.validUntil && p.validUntil < todayISO;
+    const disc = p.type === "fixed" ? `₱${p.value} off` : `${p.value}% off`;
+    const until = p.validUntil ? `until ${p.validUntil}${expired ? " — EXPIRED" : ""}` : "no expiry";
+    return `<div class="pcode ${p.active ? "" : "off"} ${expired ? "expired" : ""}">
+      <span class="c">${esc(p.code)}</span>
+      <span class="d">${disc}</span>
+      <span class="u ${expired ? "exp" : ""}">${until}</span>
+      <span class="sp">
+        <button class="tgl ${p.active ? "on" : ""}" data-code="${esc(p.code)}" data-op="toggle">${p.active ? "ON" : "OFF"}</button>
+        <button class="del" data-code="${esc(p.code)}" data-op="delete">✕</button>
+      </span>
+    </div>`;
+  }).join("");
+}
+
+async function promoPost(body) {
+  const res = await fetch(GAS_ENDPOINT, { method: "POST", body: JSON.stringify(body) });
+  return res.json();
+}
+
+document.getElementById("savePromo").addEventListener("click", async () => {
+  if (promoBusy) return;
+  const code = document.getElementById("pCode").value.trim().toUpperCase();
+  const value = parseFloat(document.getElementById("pValue").value);
+  if (!code) { alert("Enter a code."); return; }
+  if (!(value >= 0)) { alert("Enter a discount value."); return; }
+  promoBusy = true;
+  const data = await promoPost({
+    action: "promo", op: "save", key: localStorage.getItem("lpAdminKey"),
+    code, type: document.getElementById("pType").value,
+    value, validUntil: document.getElementById("pUntil").value, active: true,
+  }).catch(() => ({ ok: false }));
+  promoBusy = false;
+  if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); return; }
+  document.getElementById("pCode").value = "";
+  document.getElementById("pValue").value = "";
+  document.getElementById("pUntil").value = "";
+  renderPromos(data.promos || []);
+});
+
+promoListEl.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-op]");
+  if (!btn || promoBusy) return;
+  if (btn.dataset.op === "delete" && !confirm(`Delete code ${btn.dataset.code}?`)) return;
+  promoBusy = true;
+  btn.textContent = "…";
+  const data = await promoPost({
+    action: "promo", op: btn.dataset.op, key: localStorage.getItem("lpAdminKey"), code: btn.dataset.code,
+  }).catch(() => ({ ok: false }));
+  promoBusy = false;
+  if (!data.ok) { alert("Something went wrong."); loadPromos(); return; }
+  renderPromos(data.promos || []);
+});
+
+document.getElementById("reloadPromos").addEventListener("click", loadPromos);
+
 load();
+loadPromos();
 </script>
 </body>
 </html>
