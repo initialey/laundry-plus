@@ -536,6 +536,28 @@ select {
   color: var(--ink-deep);
 }
 .totalcard .estnote b { color: var(--yellow-deep); }
+.totalcard .promo { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 2px dashed #cdeaf8; }
+.totalcard .promorow { display: flex; gap: 8px; }
+.totalcard .promorow input { text-transform: uppercase; }
+.promobtn {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 18px;
+  background: var(--sky);
+  color: var(--white);
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--sky-dot);
+}
+.promobtn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--sky-dot); }
+.promobtn:disabled { opacity: .6; cursor: wait; }
+.promomsg { margin-top: 6px; font-size: 12px; font-weight: 700; min-height: 1px; }
+.promomsg.ok { color: var(--green, #2eb872); }
+.promomsg.err { color: var(--pink); }
+.totalcard .line.promoline span:last-child { color: var(--green, #2eb872); }
 .submit {
   width: 100%;
   padding: 16px;
@@ -819,9 +841,18 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <div class="totalcard">
+      <div class="promo">
+        <label class="lbl" for="promoCode">Promo Code</label>
+        <div class="promorow">
+          <input type="text" id="promoCode" name="promoCode" placeholder="Enter code" autocomplete="off" autocapitalize="characters">
+          <button type="button" class="promobtn" id="applyPromo">Apply</button>
+        </div>
+        <p class="promomsg" id="promoMsg"></p>
+      </div>
       <div class="line"><span>Loads subtotal</span><span id="subLoads">₱0</span></div>
       <div class="line"><span>Speed surcharge</span><span id="subSpeed">₱0</span></div>
       <div class="line"><span>Add-ons</span><span id="subAddons">₱0</span></div>
+      <div class="line promoline" id="promoLine" style="display:none"><span id="promoLabel">Promo</span><span id="subDiscount">−₱0</span></div>
       <div class="grand">
         <span class="t">TOTAL</span>
         <span class="v"><small>₱</small><span id="grandTotal">0</span></span>
@@ -1059,16 +1090,33 @@ function computeTotals() {
       const a = ADDONS.find(x => x.id === el.value);
       return s + (a.per === "load" ? a.fee * totalUnits : a.fee);
     }, 0);
-  return { loads, subLoads, subSpeed, subAddons, total: subLoads + subSpeed + subAddons };
+  const gross = subLoads + subSpeed + subAddons;
+  // applied promo (validated by GAS) → discount; never below ₱0
+  let discount = 0;
+  if (appliedPromo) {
+    discount = appliedPromo.type === "percent"
+      ? Math.round(gross * appliedPromo.value / 100)
+      : appliedPromo.value;
+    discount = Math.min(discount, gross);
+  }
+  return { loads, subLoads, subSpeed, subAddons, discount, total: gross - discount };
 }
 function updateTotals() {
-  const { loads, subLoads, subSpeed, subAddons, total } = computeTotals();
+  const { loads, subLoads, subSpeed, subAddons, discount, total } = computeTotals();
   [...loadsEl.querySelectorAll(".load")].forEach((row, i) => {
     row.querySelector(".amt").textContent = php(loads[i].amount);
   });
   document.getElementById("subLoads").textContent = php(subLoads);
   document.getElementById("subSpeed").textContent = php(subSpeed);
   document.getElementById("subAddons").textContent = php(subAddons);
+  const promoLine = document.getElementById("promoLine");
+  if (appliedPromo && discount > 0) {
+    promoLine.style.display = "";
+    document.getElementById("promoLabel").textContent = `Promo (${appliedPromo.code})`;
+    document.getElementById("subDiscount").textContent = "−" + php(discount);
+  } else {
+    promoLine.style.display = "none";
+  }
   document.getElementById("grandTotal").textContent = total.toLocaleString("en-PH");
 }
 
@@ -1258,6 +1306,60 @@ async function submitToGAS(payload) {
   return res.json();
 }
 
+// ===== Promo code =====
+// appliedPromo = { code, type: "percent"|"fixed", value } once validated by GAS.
+let appliedPromo = null;
+const promoInput = document.getElementById("promoCode");
+const promoMsg = document.getElementById("promoMsg");
+const applyBtn = document.getElementById("applyPromo");
+
+function setPromoMsg(text, kind) {
+  promoMsg.textContent = text;
+  promoMsg.className = "promomsg" + (kind ? " " + kind : "");
+}
+function clearPromo(silent) {
+  appliedPromo = null;
+  if (!silent) setPromoMsg("");
+  updateTotals();
+}
+
+async function applyPromo() {
+  const code = promoInput.value.trim().toUpperCase();
+  if (!code) { clearPromo(); setPromoMsg("Enter a promo code.", "err"); return; }
+  applyBtn.disabled = true;
+  setPromoMsg("Checking…");
+  try {
+    let result;
+    if (!GAS_ENDPOINT) { // mock: TEST10 = 10% off, TEST50 = ₱50 off
+      const mock = { TEST10: { type: "percent", value: 10 }, TEST50: { type: "fixed", value: 50 } }[code];
+      result = mock ? { ok: true, code, ...mock } : { ok: false, reason: "Code not found." };
+    } else {
+      const res = await fetch(`${GAS_ENDPOINT}?action=promo&code=${encodeURIComponent(code)}`);
+      result = await res.json();
+    }
+    if (result.ok) {
+      appliedPromo = { code: result.code || code, type: result.type, value: result.value };
+      updateTotals();
+      const { discount } = computeTotals();
+      const label = appliedPromo.type === "percent" ? `${appliedPromo.value}% off` : `₱${appliedPromo.value} off`;
+      setPromoMsg(`Applied ${appliedPromo.code} — ${label} (−${php(discount)}).`, "ok");
+    } else {
+      clearPromo(true);
+      setPromoMsg(result.reason || "That code can’t be used.", "err");
+    }
+  } catch (err) {
+    clearPromo(true);
+    setPromoMsg("Couldn’t check the code. Please try again.", "err");
+    console.error(err);
+  } finally {
+    applyBtn.disabled = false;
+  }
+}
+applyBtn.addEventListener("click", applyPromo);
+promoInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } });
+// editing the code after applying invalidates the applied promo
+promoInput.addEventListener("input", () => { if (appliedPromo && promoInput.value.trim().toUpperCase() !== appliedPromo.code) clearPromo(); });
+
 document.getElementById("orderForm").addEventListener("submit", async e => {
   e.preventDefault();
   const form = e.target;
@@ -1274,7 +1376,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   btn.textContent = "Sending…";
 
   const speed = document.querySelector("input[name=speed]:checked");
-  const { loads, total } = computeTotals();
+  const { loads, discount, total } = computeTotals();
   const addons = [...document.querySelectorAll("input[name=addon]:checked")].map(el => {
     const a = ADDONS.find(x => x.id === el.value);
     return `${a.label} (+₱${a.fee}${a.per === "load" ? "/load" : ""})`;
@@ -1301,6 +1403,8 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     speed: speed.value,
     notes: form.notes.value.trim(),
     tncAgreedAt: new Date().toISOString(),
+    promoCode: appliedPromo ? appliedPromo.code : "",
+    discount,
     total,
   };
 
