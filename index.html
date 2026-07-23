@@ -1360,7 +1360,10 @@ async function applyPromo() {
       const mock = { TEST10: { type: "percent", value: 10 }, TEST50: { type: "fixed", value: 50 } }[code];
       result = mock ? { ok: true, code, ...mock } : { ok: false, reason: "Code not found." };
     } else {
-      const res = await fetch(`${GAS_ENDPOINT}?action=promo&code=${encodeURIComponent(code)}`);
+      // pass the phone (if entered) so the shop's one-use-per-customer codes
+      // can be checked at apply time; the server re-checks on submit too
+      const phone = document.getElementById("phone").value.trim();
+      const res = await fetch(`${GAS_ENDPOINT}?action=promo&code=${encodeURIComponent(code)}&phone=${encodeURIComponent(phone)}`);
       result = await res.json();
     }
     if (result.ok) {

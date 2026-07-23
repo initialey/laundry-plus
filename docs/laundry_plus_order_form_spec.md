@@ -141,9 +141,20 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
   (gross = loads + speed + add-ons)。合計は `gross − discount`(₱0未満にはならない)。
 - ロード・スピード・アドオンを変更すると割引も自動再計算。コード欄を編集すると適用は解除。
 - 送信データに `promoCode` と `discount` を含め、Ordersシートの **「Promo Code」「Discount」列**に記録。
-- **管理は admin.html の Promo Codes パネル**で行う(コード追加/更新、ON/OFF、削除)。
-  コードは Google スプレッドシートの **PromoCodes シート**(Code / Type / Value / Valid Until /
-  Active / Notes)に保存。同名コードは上書き。
+- **利用回数制限(1回限り対応)**:
+  - **Max Uses**: 累計使用可能回数(0/空欄=無制限)。`Used Count >= Max Uses` で拒否 →
+    "This promo code has already been used."
+  - **One Time Per Customer**: TRUE の場合、Ordersシートを phone(または email)+ promoCode で
+    照合し、既に使用済みなら拒否 → "This code can only be used once per customer."
+    顧客識別は phone を数字のみ正規化して比較(Email列があれば email も照合)。
+  - **検証タイミング**: Apply時(`?action=promo&code=&phone=`)と**注文確定時(doPost)**の両方で検証。
+    確定時に無効なら割引を外して記録(不正な二重利用を防止)。有効だった場合のみ **Used Count を +1**。
+- **管理は admin.html の Promo Codes パネル**で行う(コード追加/更新、ON/OFF、Used Countリセット↺、削除、
+  Max Uses入力、Once-per-customerトグル)。コードは Google スプレッドシートの **PromoCodes シート**
+  (Code / Type / Value / Valid Until / Active / Notes / **Max Uses / Used Count / One Time Per Customer**)
+  に保存。同名コードは上書き(編集時は Used Count を保持)。
+  - 初期データ: `FIRSTORDER`(percent 10% / 2026-08-31まで / Max Uses 1 / One Time Per Customer TRUE)。
+  - 旧6列シートは Max Uses=0・Used Count=0・Once=FALSE として読むため、既存コードは影響なし。
 
 ## §5 スピードオプション
 

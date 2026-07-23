@@ -43,11 +43,15 @@ const RIDERS_SHEET = "Riders";
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
 const BLOCKED_SHEET = "BlockedSlots";
 
-// Promo codes (managed from admin.html). Columns: Code / Type / Value /
-// Valid Until / Active / Notes. Type is "percent" (Value = % off) or
-// "fixed" (Value = ₱ off). Valid Until is inclusive; blank = no expiry.
+// Promo codes (managed from admin.html). Columns:
+//   Code / Type / Value / Valid Until / Active / Notes /
+//   Max Uses / Used Count / One Time Per Customer
+// Type is "percent" (Value = % off) or "fixed" (Value = ₱ off). Valid Until
+// is inclusive; blank = no expiry. Max Uses blank/0 = unlimited. Used Count
+// is the running total (incremented on order submit). One Time Per Customer
+// TRUE ⇒ a phone/email may use the code only once.
 const PROMO_SHEET = "PromoCodes";
-const PROMO_HEADERS = ["Code", "Type", "Value", "Valid Until", "Active", "Notes"];
+const PROMO_HEADERS = ["Code", "Type", "Value", "Valid Until", "Active", "Notes", "Max Uses", "Used Count", "One Time Per Customer"];
 
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
@@ -65,6 +69,25 @@ function doPost(e) {
     .map(function (l) { return l.label + " " + (l.qty || l.kg) + (l.unit || "kg") + " = P" + l.amount; })
     .join("\n");
   const addonsText = (data.addons || []).join("\n");
+
+  // Re-validate the promo server-side (authoritative). If it no longer holds
+  // — used up, already used by this customer, expired — drop the discount so
+  // it can't be reused. The customer's own order isn't in the sheet yet, so
+  // customerUsedPromo won't self-match.
+  let promoCode = data.promoCode || "";
+  let discount = Number(data.discount) || 0;
+  let total = Number(data.total) || 0;
+  let promoOk = false;
+  if (promoCode) {
+    const v = validatePromo(promoCode, data.phone, data.email);
+    if (v.ok) {
+      promoOk = true;
+    } else {
+      total = total + discount; // restore the (now unavailable) discount
+      discount = 0;
+      promoCode = "";
+    }
+  }
 
   sheet.appendRow([
     data.receiptNo,
@@ -86,10 +109,15 @@ function doPost(e) {
     data.tncAgreedAt ? new Date(data.tncAgreedAt) : "", // T&C agreement timestamp
     data.speed,
     data.notes,
-    data.promoCode || "",
-    data.discount || 0,
-    data.total,
+    promoCode,
+    discount,
+    total,
   ]);
+
+  // count the use only after the order is safely recorded
+  if (promoOk) {
+    try { incrementPromoUse(promoCode); } catch (err) { console.error("promo increment failed: " + err); }
+  }
 
   // Telegram notification — an error here must not break order recording
   try {
@@ -106,8 +134,8 @@ function doPost(e) {
       "🧦 Separation: " + (data.separation || "-") +
       (addonsText ? "\n➕ " + (data.addons || []).join(", ") : "") +
       (data.notes ? "\n📝 " + data.notes : "") +
-      (data.promoCode ? "\n🎟 Promo: " + data.promoCode + " (−P" + (data.discount || 0) + ")" : "") + "\n" +
-      "💰 Total: P" + data.total + " (estimate)"
+      (promoCode ? "\n🎟 Promo: " + promoCode + " (−P" + discount + ")" : "") + "\n" +
+      "💰 Total: P" + total + " (estimate)"
     );
   } catch (err) {
     console.error("Telegram notify failed: " + err);
@@ -162,9 +190,10 @@ function doGet(e) {
     return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), cap: capacityForDate(p.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
   }
 
-  // Public: validate a promo code entered on the booking form.
+  // Public: validate a promo code entered on the booking form. phone/email
+  // (optional) enable the one-use-per-customer check.
   if (p.action === "promo" && p.code) {
-    return jsonOut(validatePromo(p.code));
+    return jsonOut(validatePromo(p.code, p.phone, p.email));
   }
 
   // Admin: list all promo codes for admin.html.
@@ -318,7 +347,8 @@ function promoTruthy(v) {
   return v === true || s === "TRUE" || s === "YES" || s === "1" || s === "✓";
 }
 
-// Returns [{ code, type, value, validUntil, active, notes }]
+// Returns [{ code, type, value, validUntil, active, notes, maxUses, usedCount, oncePerCustomer }]
+// (older 6-column sheets read maxUses/usedCount = 0 and oncePerCustomer = false.)
 function readPromos() {
   const sheet = getPromoSheet();
   const out = [];
@@ -332,14 +362,39 @@ function readPromos() {
         validUntil: promoToISO(r[3]),
         active: promoTruthy(r[4]),
         notes: String(r[5] || ""),
+        maxUses: Number(r[6]) || 0,          // 0 / blank = unlimited
+        usedCount: Number(r[7]) || 0,
+        oncePerCustomer: promoTruthy(r[8]),
       });
     });
   }
   return out;
 }
 
-// Public validation used by the booking form.
-function validatePromo(codeRaw) {
+// Normalise a phone (digits only) for customer matching.
+function normPhone(p) { return String(p || "").replace(/\D/g, ""); }
+
+// Has this customer (phone or email) already used this promo code? Scans Orders.
+function customerUsedPromo(code, phone, email) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  const iPhone = HEADERS.indexOf("Phone");
+  const iPromo = HEADERS.indexOf("Promo Code");
+  const iEmail = HEADERS.indexOf("Email"); // -1 unless an Email column exists
+  const wantPhone = normPhone(phone);
+  const wantEmail = String(email || "").trim().toLowerCase();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][iPromo]).trim().toUpperCase() !== code) continue;
+    if (wantPhone && normPhone(rows[i][iPhone]) === wantPhone) return true;
+    if (wantEmail && iEmail >= 0 && String(rows[i][iEmail]).trim().toLowerCase() === wantEmail) return true;
+  }
+  return false;
+}
+
+// Public validation used by the booking form. phone/email are optional; when
+// present they enable the per-customer check.
+function validatePromo(codeRaw, phone, email) {
   const code = String(codeRaw).trim().toUpperCase();
   const promo = readPromos().filter(function (p) { return p.code === code; })[0];
   if (!promo) return { ok: false, reason: "Code not found." };
@@ -348,7 +403,30 @@ function validatePromo(codeRaw) {
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
     if (promo.validUntil < today) return { ok: false, reason: "This code has expired." };
   }
+  // ① total usage cap (0 / blank = unlimited)
+  if (promo.maxUses > 0 && promo.usedCount >= promo.maxUses) {
+    return { ok: false, reason: "This promo code has already been used." };
+  }
+  // ② one use per customer (only checkable once we know phone/email)
+  if (promo.oncePerCustomer && (phone || email) && customerUsedPromo(code, phone, email)) {
+    return { ok: false, reason: "This code can only be used once per customer." };
+  }
   return { ok: true, code: promo.code, type: promo.type, value: promo.value, validUntil: promo.validUntil };
+}
+
+// Increment the Used Count for a code (called on a valid order submit).
+function incrementPromoUse(codeRaw) {
+  const code = String(codeRaw).trim().toUpperCase();
+  const sheet = getPromoSheet();
+  if (sheet.getLastRow() < 2) return;
+  const codes = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < codes.length; i++) {
+    if (String(codes[i][0]).trim().toUpperCase() === code) {
+      const cell = sheet.getRange(i + 2, 8); // Used Count column
+      cell.setValue((Number(cell.getValue()) || 0) + 1);
+      return;
+    }
+  }
 }
 
 // POST { action:"promo", key, op:"save"|"delete"|"toggle", code, type, value, validUntil, active }
@@ -374,8 +452,12 @@ function handlePromo(data) {
       const cur = promoTruthy(sheet.getRange(rowNum, 5).getValue());
       sheet.getRange(rowNum, 5).setValue(!cur);
     }
+  } else if (data.op === "reset") {
+    if (rowNum > 0) sheet.getRange(rowNum, 8).setValue(0); // reset Used Count
   } else { // save (upsert)
     const type = String(data.type).toLowerCase() === "fixed" ? "fixed" : "percent";
+    // preserve the running Used Count when editing an existing code
+    const usedCount = rowNum > 0 ? (Number(sheet.getRange(rowNum, 8).getValue()) || 0) : 0;
     const row = [
       "'" + code,
       type,
@@ -383,6 +465,9 @@ function handlePromo(data) {
       data.validUntil ? "'" + String(data.validUntil).slice(0, 10) : "",
       data.active === false ? false : true,
       data.notes || "",
+      Math.max(0, Math.round(Number(data.maxUses) || 0)),
+      usedCount,
+      data.oncePerCustomer === true,
     ];
     if (rowNum > 0) sheet.getRange(rowNum, 1, 1, PROMO_HEADERS.length).setValues([row]);
     else sheet.appendRow(row);
@@ -415,10 +500,12 @@ function setupSheet() {
   getBlockedSheet(); // create the BlockedSlots sheet too
   getRidersSheet();  // create the Riders sheet too
 
-  // PromoCodes sheet with a disabled example row so the format is clear
+  // PromoCodes sheet — seed the FIRSTORDER code + a disabled example
   const promo = getPromoSheet();
   if (promo.getLastRow() === 1) {
-    promo.appendRow(["'WELCOME50", "fixed", 50, "", false, "Example: ₱50 off (inactive)"]);
+    // Code, Type, Value, Valid Until, Active, Notes, Max Uses, Used Count, One Time Per Customer
+    promo.appendRow(["'FIRSTORDER", "percent", 10, "'2026-08-31", true, "10% off, first order only", 1, 0, true]);
+    promo.appendRow(["'WELCOME50", "fixed", 50, "", false, "Example: ₱50 off (inactive)", 0, 0, false]);
   }
   promo.setFrozenRows(1);
 
