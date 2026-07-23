@@ -212,7 +212,7 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
       <h2>Rider Management</h2>
       <span class="ridercap" id="riderCap"></span>
     </div>
-    <p class="ridersub">Riders working <b id="riderDay">this day</b> — each rider covers 1 booking per slot, so the slot capacity equals the number of riders.</p>
+    <p class="ridersub">Riders working <b id="riderDay">this day</b> — each rider covers 4 bookings per slot, so the slot capacity is riders × 4 (1 rider ⇒ 4, 2 riders ⇒ 8).</p>
     <div class="riderbtns" id="riderBtns">
       <button class="rbtn" data-count="1">1 Rider</button>
       <button class="rbtn" data-count="2">2 Riders</button>
@@ -301,9 +301,10 @@ function renderHeader() {
 const riderBtns = document.getElementById("riderBtns");
 let riderBusy = false;
 
-function renderRiders(count) {
+function renderRiders(count, capacity) {
+  if (typeof capacity !== "number") capacity = count * 4;
   document.getElementById("riderDay").textContent = curDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  document.getElementById("riderCap").textContent = `Slot capacity: ${count}/slot`;
+  document.getElementById("riderCap").textContent = `Slot capacity: ${capacity}/slot`;
   [...riderBtns.querySelectorAll(".rbtn")].forEach(b => {
     b.classList.toggle("active", Number(b.dataset.count) === count);
     b.disabled = false;
@@ -355,8 +356,8 @@ async function load() {
   }
   if (date !== toISODate(curDate)) return; // user already navigated away
 
-  renderRiders(typeof data.riders === "number" ? data.riders : (data.cap || 2));
-  const cap = data.cap || 2;
+  const cap = data.cap || 8;
+  renderRiders(typeof data.riders === "number" ? data.riders : 2, cap);
   let html = "";
   for (const s of SLOTS) {
     const slot = s.v;

@@ -32,11 +32,12 @@ const HEADERS = [
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
 
-// Per-slot capacity = number of riders working that day (each rider covers
-// one booking per slot). Default 2 riders ⇒ 2 bookings/slot; set 1 rider for
-// a given day ⇒ that day's slots go FULL at 1 booking. Managed from
-// admin.html and stored in the Riders sheet (Date, Count).
+// Per-slot capacity = number of riders working that day × SLOTS_PER_RIDER.
+// Each rider covers 4 bookings per slot, so 1 rider ⇒ 4/slot, 2 riders ⇒
+// 8/slot. Default 2 riders (⇒ 8). Managed from admin.html and stored in the
+// Riders sheet (Date, Count, Updated At).
 const DEFAULT_RIDERS = 2;
+const SLOTS_PER_RIDER = 4;
 const RIDERS_SHEET = "Riders";
 
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
@@ -121,12 +122,12 @@ function doPost(e) {
 // GET ?action=day&date=YYYY-MM-DD&key=ADMIN_KEY  (admin.html)
 //   → { ok, cap, riders, blocked: ["08:00"], bookings: [{slot, type, receipt,
 //     name, phone, speed, status}] }
-// GET ?action=riders&date=YYYY-MM-DD&key=ADMIN_KEY → { ok, date, riders, def }
+// GET ?action=riders&date=YYYY-MM-DD&key=ADMIN_KEY → { ok, date, riders, cap, perRider, def }
 function doGet(e) {
   const p = (e && e.parameter) || {};
 
   if (p.action === "slots" && p.date) {
-    const cap = ridersForDate(p.date);
+    const cap = capacityForDate(p.date);
     const counts = {};
     forEachBookingOn(p.date, function (slot, type, row, idx) {
       if (String(row[idx.status]) === "CANCELLED") return;
@@ -152,13 +153,13 @@ function doGet(e) {
         status: String(row[idx.status]),
       });
     });
-    return jsonOut({ ok: true, cap: ridersForDate(p.date), riders: ridersForDate(p.date), blocked: getBlocked(p.date), bookings: bookings });
+    return jsonOut({ ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date), blocked: getBlocked(p.date), bookings: bookings });
   }
 
   // Admin: read the rider count for a date.
   if (p.action === "riders" && p.date) {
     if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
-    return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), def: DEFAULT_RIDERS });
+    return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), cap: capacityForDate(p.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
   }
 
   // Public: validate a promo code entered on the booking form.
@@ -213,12 +214,12 @@ function getRidersSheet() {
   let sheet = ss.getSheetByName(RIDERS_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(RIDERS_SHEET);
-    sheet.appendRow(["Date", "Count"]);
+    sheet.appendRow(["Date", "Count", "Updated At"]);
   }
   return sheet;
 }
 
-// Rider count (= per-slot capacity) for a date; DEFAULT_RIDERS if unset.
+// Rider count for a date; DEFAULT_RIDERS if unset.
 function ridersForDate(date) {
   const sheet = getRidersSheet();
   if (sheet.getLastRow() > 1) {
@@ -231,6 +232,11 @@ function ridersForDate(date) {
     }
   }
   return DEFAULT_RIDERS;
+}
+
+// Per-slot capacity for a date = riders × SLOTS_PER_RIDER.
+function capacityForDate(date) {
+  return ridersForDate(date) * SLOTS_PER_RIDER;
 }
 
 // POST { action:"riders", key, date, count } — set the rider count for a day.
@@ -247,14 +253,15 @@ function handleRiders(data) {
     }
   }
   // storing DEFAULT is fine, but keep the sheet tidy: a default value removes the override
+  const now = new Date();
   if (count === DEFAULT_RIDERS) {
     if (rowNum > 0) sheet.deleteRow(rowNum);
   } else if (rowNum > 0) {
-    sheet.getRange(rowNum, 2).setValue(count);
+    sheet.getRange(rowNum, 2, 1, 2).setValues([[count, now]]);
   } else {
-    sheet.appendRow(["'" + data.date, count]);
+    sheet.appendRow(["'" + data.date, count, now]);
   }
-  return jsonOut({ ok: true, date: data.date, riders: ridersForDate(data.date), def: DEFAULT_RIDERS });
+  return jsonOut({ ok: true, date: data.date, riders: ridersForDate(data.date), cap: capacityForDate(data.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
 }
 
 function getBlocked(date) {
