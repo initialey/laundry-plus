@@ -32,9 +32,12 @@ const HEADERS = [
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
 
-// How many pickups/deliveries the rider can handle in one hourly slot.
-// The form asks GET ?action=slots&date=YYYY-MM-DD and disables full slots.
-const SLOT_CAP = 2;
+// Per-slot capacity = number of riders working that day (each rider covers
+// one booking per slot). Default 2 riders ⇒ 2 bookings/slot; set 1 rider for
+// a given day ⇒ that day's slots go FULL at 1 booking. Managed from
+// admin.html and stored in the Riders sheet (Date, Count).
+const DEFAULT_RIDERS = 2;
+const RIDERS_SHEET = "Riders";
 
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
 const BLOCKED_SHEET = "BlockedSlots";
@@ -49,6 +52,7 @@ function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   if (data.action === "block") return handleBlock(data); // from admin.html
   if (data.action === "promo") return handlePromo(data); // from admin.html
+  if (data.action === "riders") return handleRiders(data); // from admin.html
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -112,24 +116,26 @@ function doPost(e) {
 }
 
 // GET ?action=slots&date=YYYY-MM-DD  (public, used by the booking form)
-//   → { cap, counts: { "08:00": 1, ... } } — pickups + deliveries per hourly
-//     slot (cancelled orders excluded). Manually blocked slots report as full.
+//   → { cap, counts: { "08:00": 1, ... } } — cap = riders that day; counts are
+//     pickups + deliveries per slot (cancelled excluded). Blocked slots report full.
 // GET ?action=day&date=YYYY-MM-DD&key=ADMIN_KEY  (admin.html)
-//   → { ok, cap, blocked: ["08:00"], bookings: [{slot, type, receipt, name,
-//     phone, speed, status}] }
+//   → { ok, cap, riders, blocked: ["08:00"], bookings: [{slot, type, receipt,
+//     name, phone, speed, status}] }
+// GET ?action=riders&date=YYYY-MM-DD&key=ADMIN_KEY → { ok, date, riders, def }
 function doGet(e) {
   const p = (e && e.parameter) || {};
 
   if (p.action === "slots" && p.date) {
+    const cap = ridersForDate(p.date);
     const counts = {};
     forEachBookingOn(p.date, function (slot, type, row, idx) {
       if (String(row[idx.status]) === "CANCELLED") return;
       counts[slot] = (counts[slot] || 0) + 1;
     });
     getBlocked(p.date).forEach(function (slot) {
-      counts[slot] = Math.max(counts[slot] || 0, SLOT_CAP); // report as full
+      counts[slot] = Math.max(counts[slot] || 0, cap); // report as full
     });
-    return jsonOut({ cap: SLOT_CAP, counts: counts });
+    return jsonOut({ cap: cap, counts: counts });
   }
 
   if (p.action === "day" && p.date) {
@@ -146,7 +152,13 @@ function doGet(e) {
         status: String(row[idx.status]),
       });
     });
-    return jsonOut({ ok: true, cap: SLOT_CAP, blocked: getBlocked(p.date), bookings: bookings });
+    return jsonOut({ ok: true, cap: ridersForDate(p.date), riders: ridersForDate(p.date), blocked: getBlocked(p.date), bookings: bookings });
+  }
+
+  // Admin: read the rider count for a date.
+  if (p.action === "riders" && p.date) {
+    if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+    return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), def: DEFAULT_RIDERS });
   }
 
   // Public: validate a promo code entered on the booking form.
@@ -193,6 +205,56 @@ function getBlockedSheet() {
     sheet.appendRow(["Date", "Slot"]);
   }
   return sheet;
+}
+
+// ===== Riders (per-slot capacity per day) =====
+function getRidersSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(RIDERS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(RIDERS_SHEET);
+    sheet.appendRow(["Date", "Count"]);
+  }
+  return sheet;
+}
+
+// Rider count (= per-slot capacity) for a date; DEFAULT_RIDERS if unset.
+function ridersForDate(date) {
+  const sheet = getRidersSheet();
+  if (sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === date) {
+        const n = Number(rows[i][1]);
+        return n > 0 ? n : DEFAULT_RIDERS;
+      }
+    }
+  }
+  return DEFAULT_RIDERS;
+}
+
+// POST { action:"riders", key, date, count } — set the rider count for a day.
+function handleRiders(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.date) return jsonOut({ ok: false, error: "missing date" });
+  const count = Math.max(0, Math.min(8, Math.round(Number(data.count))));
+  const sheet = getRidersSheet();
+  let rowNum = -1;
+  if (sheet.getLastRow() > 1) {
+    const dates = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < dates.length; i++) {
+      if (String(dates[i][0]) === data.date) { rowNum = i + 2; break; }
+    }
+  }
+  // storing DEFAULT is fine, but keep the sheet tidy: a default value removes the override
+  if (count === DEFAULT_RIDERS) {
+    if (rowNum > 0) sheet.deleteRow(rowNum);
+  } else if (rowNum > 0) {
+    sheet.getRange(rowNum, 2).setValue(count);
+  } else {
+    sheet.appendRow(["'" + data.date, count]);
+  }
+  return jsonOut({ ok: true, date: data.date, riders: ridersForDate(data.date), def: DEFAULT_RIDERS });
 }
 
 function getBlocked(date) {
@@ -344,6 +406,7 @@ function setupSheet() {
   if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS);
   sheet.setFrozenRows(1);
   getBlockedSheet(); // create the BlockedSlots sheet too
+  getRidersSheet();  // create the Riders sheet too
 
   // PromoCodes sheet with a disabled example row so the format is clear
   const promo = getPromoSheet();

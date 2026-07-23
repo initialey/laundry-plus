@@ -167,6 +167,17 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
 }
 .pcode .tgl.on { border-color: var(--green); color: var(--green); }
 .pcode .del:hover { border-color: var(--red); color: var(--red); }
+.riderhead { display: flex; align-items: center; justify-content: space-between; }
+.riderhead h2 { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--sky-deep); }
+.ridercap { font-weight: 800; font-size: 12px; color: var(--pink); }
+.ridersub { margin: 6px 0 12px; font-size: 12px; font-weight: 700; color: #6aa9c9; line-height: 1.5; }
+.riderbtns { display: flex; gap: 10px; }
+.rbtn {
+  flex: 1; padding: 12px; border: 2px solid #cdeaf8; background: #eef8fd; border-radius: 14px;
+  font-family: var(--body); font-weight: 800; font-size: 15px; color: var(--ink); cursor: pointer; transition: all .15s;
+}
+.rbtn.active { border-color: var(--sky); background: #fff; color: var(--sky-deep); box-shadow: 0 3px 0 rgba(63,180,230,.3); }
+.rbtn:disabled { opacity: .5; cursor: wait; }
 </style>
 </head>
 <body>
@@ -194,6 +205,19 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
       <button class="nav" id="nextDay" aria-label="Next day">›</button>
       <button class="btn today" id="todayBtn">Today</button>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="riderhead">
+      <h2>Rider Management</h2>
+      <span class="ridercap" id="riderCap"></span>
+    </div>
+    <p class="ridersub">Riders working <b id="riderDay">this day</b> — each rider covers 1 booking per slot, so the slot capacity equals the number of riders.</p>
+    <div class="riderbtns" id="riderBtns">
+      <button class="rbtn" data-count="1">1 Rider</button>
+      <button class="rbtn" data-count="2">2 Riders</button>
+    </div>
+    <div class="legend">Set the rider count for the day shown above (use ‹ › / Today to change the date). Fewer riders ⇒ slots fill sooner on the booking form.</div>
   </div>
 
   <div class="card">
@@ -273,6 +297,41 @@ function renderHeader() {
   document.getElementById("curHours").textContent = `${SLOTS.length} time slots · last slot 9PM (limited)`;
 }
 
+// ===== Rider management =====
+const riderBtns = document.getElementById("riderBtns");
+let riderBusy = false;
+
+function renderRiders(count) {
+  document.getElementById("riderDay").textContent = curDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  document.getElementById("riderCap").textContent = `Slot capacity: ${count}/slot`;
+  [...riderBtns.querySelectorAll(".rbtn")].forEach(b => {
+    b.classList.toggle("active", Number(b.dataset.count) === count);
+    b.disabled = false;
+  });
+}
+
+riderBtns.addEventListener("click", async e => {
+  const btn = e.target.closest(".rbtn");
+  if (!btn || riderBusy) return;
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); return; }
+  riderBusy = true;
+  [...riderBtns.querySelectorAll(".rbtn")].forEach(b => b.disabled = true);
+  try {
+    const res = await fetch(GAS_ENDPOINT, {
+      method: "POST",
+      body: JSON.stringify({ action: "riders", key, date: toISODate(curDate), count: Number(btn.dataset.count) }),
+    });
+    const data = await res.json();
+    if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); }
+  } catch (err) {
+    alert("Couldn't reach the server. Please try again.");
+  } finally {
+    riderBusy = false;
+    load(); // refreshes rider display + slot caps together
+  }
+});
+
 async function load() {
   renderHeader();
   const key = localStorage.getItem("lpAdminKey") || "";
@@ -296,6 +355,7 @@ async function load() {
   }
   if (date !== toISODate(curDate)) return; // user already navigated away
 
+  renderRiders(typeof data.riders === "number" ? data.riders : (data.cap || 2));
   const cap = data.cap || 2;
   let html = "";
   for (const s of SLOTS) {
