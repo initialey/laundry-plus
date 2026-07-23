@@ -170,8 +170,12 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
   5:00–6:30 PM / 7:00–8:30 PM ＋ 特別枠 **9:00 PM(最終枠・optional、⚠️(Limited)バッジ表示)**。
   内部値は開始時刻 "HH:MM"(08:00 / 09:00 / 11:00 / 13:00 / 15:00 / 17:00 / 19:00 / 21:00)。
 - 当日スロットは現在時刻+1時間以降のみ表示。
-- スロット上限: 1枠あたり **SLOT_CAP = 2件**(集荷+配達の合計、GAS側で管理)。
-  満枠・管理画面でBLOCKされたスロットは「FULL」表示で選択不可。
+- **スロット上限 = その日のライダー人数**(各ライダーが1枠につき1件対応)。デフォルト **2人=2件/枠**。
+  ライダー人数を変えるとその日の全スロット上限が連動(1人=1件でFULL)。GASの **Riders シート**
+  (Date / Count)に日付ごとの人数を保存し、未設定の日は DEFAULT_RIDERS(=2)。
+  予約数(集荷+配達、CANCELLED除外)が上限以上、または管理画面でBLOCKされたスロットは「FULL」表示で選択不可。
+- ライダー人数は **admin.html の Rider Management パネル**で日付ごとに設定(1/2)。フォームは
+  `?action=slots` の `cap` を読むだけなので、人数変更に自動追従(フォーム側の改修不要)。
 
 ### §6.1 Rush / Super Rush 配達枠 固定対応表(ルックアップ)
 
@@ -212,4 +216,5 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
 - **料金計算はフォーム(index.html)側のみ**で行い、GASは `total` を記録するだけ(計算ロジックの二重管理をしない)。
 - `GET ?action=slots&date=` … スロット空き状況(公開)/ `GET ?action=day&date=&key=` … 管理画面用の予約一覧(要ADMIN_KEY)/ `POST {action:"block"}` … スロットのBLOCK/UNBLOCK。
 - `GET ?action=promo&code=` … プロモコード検証(公開)/ `GET ?action=promos&key=` … コード一覧(要ADMIN_KEY)/ `POST {action:"promo", op:"save"|"toggle"|"delete"}` … コード管理。PromoCodesシートに保存。
-- `setupSheet()` は Orders / BlockedSlots / PromoCodes の各シートを作成。
+- `GET ?action=riders&date=&key=` … その日のライダー人数取得(要ADMIN_KEY)/ `POST {action:"riders", date, count}` … 人数設定。Ridersシートに保存(DEFAULT値を設定すると行は削除)。
+- `setupSheet()` は Orders / BlockedSlots / PromoCodes / Riders の各シートを作成。

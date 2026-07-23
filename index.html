@@ -1127,8 +1127,9 @@ const rcpt = `LP-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate()
 
 // ===== Pickup & delivery time slots =====
 // Fixed slot windows (store is open 5AM–11PM). Every day offers the same
-// 7 standard windows + a special 9PM last slot. Slot counts per window are
-// capped server-side (SLOT_CAP in gas/Code.gs); full slots come back disabled.
+// 7 standard windows + a special 9PM last slot. Each window's capacity is
+// the number of riders that day (managed in admin.html) — the form reads it
+// from the `cap` in ?action=slots; full slots come back disabled.
 const SLOTS = [
   { v: "08:00", label: "8:00–9:00 AM" },
   { v: "09:00", label: "9:00–10:30 AM" },
