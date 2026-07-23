@@ -259,8 +259,8 @@ const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwngDiaWySIxwaZ6Uk
 const pad = n => String(n).padStart(2, "0");
 const toISODate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const fmtDate = d => d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-// same fixed slot windows as the booking form
-const SLOTS = [
+// same day-type slot windows as the booking form
+const WEEKDAY_SLOTS = [
   { v: "08:00", label: "8:00–9:00 AM" },
   { v: "09:00", label: "9:00–10:30 AM" },
   { v: "11:00", label: "11:00–12:30 PM" },
@@ -268,8 +268,17 @@ const SLOTS = [
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
   { v: "19:00", label: "7:00–8:30 PM" },
-  { v: "21:00", label: "9:00 PM", special: true },
+  { v: "20:30", label: "8:30–9:00 PM" },
 ];
+const WEEKEND_SLOTS = [
+  { v: "09:00", label: "9:00–10:30 AM" },
+  { v: "11:00", label: "11:00–12:30 PM" },
+  { v: "13:00", label: "1:00–2:30 PM" },
+  { v: "15:00", label: "3:00–4:30 PM" },
+  { v: "17:00", label: "5:00–6:30 PM" },
+  { v: "18:30", label: "6:30–7:00 PM" },
+];
+const slotsForDate = d => (d.getDay() === 0 || d.getDay() === 6) ? WEEKEND_SLOTS : WEEKDAY_SLOTS;
 
 const keyInput = document.getElementById("key");
 const slotsEl = document.getElementById("slots");
@@ -294,7 +303,10 @@ function esc(s) {
 
 function renderHeader() {
   document.getElementById("curDate").textContent = fmtDate(curDate);
-  document.getElementById("curHours").textContent = `${SLOTS.length} time slots · last slot 9PM (limited)`;
+  const wknd = curDate.getDay() === 0 || curDate.getDay() === 6;
+  document.getElementById("curHours").textContent = wknd
+    ? "Weekend · 9:00 AM–7:00 PM (6 slots)"
+    : "Weekday · 8:00 AM–9:00 PM (8 slots)";
 }
 
 // ===== Rider management =====
@@ -359,7 +371,7 @@ async function load() {
   const cap = data.cap || 8;
   renderRiders(typeof data.riders === "number" ? data.riders : 2, cap);
   let html = "";
-  for (const s of SLOTS) {
+  for (const s of slotsForDate(curDate)) {
     const slot = s.v;
     const bks = (data.bookings || []).filter(b => b.slot === slot);
     const active = bks.filter(b => b.status !== "CANCELLED").length;
@@ -367,7 +379,7 @@ async function load() {
     const cls = blocked ? "blocked" : (active >= cap ? "full" : "");
     html += `<div class="slot ${cls}">
       <div class="top">
-        <span class="time">${s.label}${s.special ? " ⚠️" : ""}</span>
+        <span class="time">${s.label}</span>
         <span class="cnt">${blocked ? "BLOCKED" : `${active}/${cap}${active >= cap ? " FULL" : ""}`}</span>
         <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
       </div>

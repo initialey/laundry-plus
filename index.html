@@ -471,15 +471,18 @@ select {
 }
 .speed input:disabled + span { opacity: .45; cursor: not-allowed; }
 /* recommended separation option: soft highlight (checked style still wins) */
-.speed.recommend > span { border-color: var(--yellow); background: #fffcf0; }
+/* recommended = neutral slate outline, deliberately different from the
+   yellow "selected" highlight (the checked style still wins when picked) */
+.speed.recommend > span { border-color: #b7c6cf; border-style: dashed; background: #f5f8fa; }
 .speed .recbadge {
   display: inline-block;
   margin: 3px 0 1px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .02em;
-  color: var(--yellow-deep);
-  background: #fff6d6;
+  color: #5b7788;
+  background: #e7eef2;
+  border: 1px solid #cdd9e0;
   border-radius: 999px;
   padding: 2px 9px;
   white-space: nowrap;
@@ -728,16 +731,16 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 
   <div class="pricebar">
     <div class="prow main">
-      <div class="pl">Assorted Clothes<br>Up to 7kg</div>
-      <div class="pr"><span class="num">240</span><span class="per">PHP/load</span></div>
+      <div class="pl">Assorted Clothes<br>Up to 7kg <small>(max 12kg)</small></div>
+      <div class="pr"><span class="num">240</span><span class="per">PHP</span></div>
     </div>
     <div class="prow">
-      <div class="pl">↳ Additional Weight <small>(Max 12kg per load)</small></div>
+      <div class="pl">↳ Additional Weight <small>(+₱45/kg, pricing applies up to 12kg only)</small></div>
       <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
     </div>
     <div class="prow">
-      <div class="pl">Blankets/Jeans/Towels <small>(per 5kg load)</small></div>
-      <div class="pr"><span class="num sm">240</span><span class="per">PHP/Load</span></div>
+      <div class="pl">Blankets/Jeans/Towels <small>(max 5kg/load)</small></div>
+      <div class="pr"><span class="num sm">240</span><span class="per">PHP</span></div>
     </div>
     <div class="sulit">
       <div class="thumb"><span>👍</span>SULIT!</div>
@@ -781,8 +784,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="loads" id="loads"></div>
       <button type="button" class="add-load" id="addLoad">+ Add another load</button>
       <p class="hint">Pick a service, then enter the weight (kg) or number of pieces (pc). Wash + Dry + Press is ready in 48–72 hrs.</p>
-      <p class="hint">Additional weight is capped at 12kg per load. Orders above 12kg are calculated as multiple loads.<br>
-      <span lang="tl">Ang additional weight ay may cap na 12kg per load. Kapag lumagpas ng 12kg, kukwentahin na ito bilang multiple loads.</span></p>
+      <p class="hint">Additional weight pricing (+₱45/kg) applies up to 12kg only. Beyond 12kg, the computation restarts at ₱240 for the next 7kg.<br>
+      <span lang="tl">Ang +₱45 kada excess kilo ay hanggang 12kg lamang. Kapag lumampas sa 12kg, magsisimula ulit ang computation sa ₱240 para sa susunod na 7kg.</span></p>
     </section>
 
     <section class="card">
@@ -791,7 +794,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
     </section>
 
     <section class="card">
-      <h2><span class="step">4</span>Separate Laundry Option or Preference</h2>
+      <h2><span class="step">4</span>Separate Laundry Preference</h2>
       <div class="speeds" id="separation"></div>
       <div class="field" id="bagCountField" style="display:none; margin-top:10px">
         <label class="lbl" for="bagCount">No. of Bags<span class="req">*</span></label>
@@ -831,7 +834,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
           <select id="deliveryTime" name="deliveryTime" required data-err="Please choose a delivery time slot."></select>
         </div>
       </div>
-      <p class="hint">Time slots: 8:00–9:00 AM · 9:00–10:30 AM · 11:00–12:30 PM · 1:00–2:30 PM · 3:00–4:30 PM · 5:00–6:30 PM · 7:00–8:30 PM, plus a limited 9:00 PM last slot ⚠️. Full slots show as FULL. Standard is ready 2 days after pickup; 24 Hours the next day; Rush &amp; Super Rush deliver same-day (slots depend on your pickup time).</p>
+      <p class="hint">Time slots — Weekdays: 8:00 AM to 9:00 PM (last slot 8:30–9:00 PM). Weekends: 9:00 AM to 7:00 PM (last slot 6:30–7:00 PM). Full slots show as FULL. Standard is ready 2 days after pickup; 24 Hours the next day. Rush &amp; Super Rush can deliver the same day (choose the pickup date) or a later date; same-day delivery uses limited slots and may switch to Lalamove.</p>
       <p class="hint" id="lalamoveNote" style="display:none">🛵 No same-day delivery slot is available for this pickup time. Delivery will be <b>via Lalamove — the customer arranges and pays separately.</b></p>
     </section>
 
@@ -894,7 +897,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 </div>
 
 <footer><span class="nowrap">LAUNDRY+ ・ OPEN DAILY 5AM–11PM</span><br>
-<span class="fsub">PICKUP &amp; DELIVERY BY TIME SLOT ・ <span class="nowrap">LAST SLOT 9PM (LIMITED)</span></span></footer>
+<span class="fsub">PICKUP &amp; DELIVERY — <span class="nowrap">WEEKDAYS 8AM–9PM</span> ・ <span class="nowrap">WEEKENDS 9AM–7PM</span></span></footer>
 
 <script>
 // ===== Pricing master (sync with GAS sheet later) =====
@@ -1126,11 +1129,11 @@ const pad = n => String(n).padStart(2, "0");
 const rcpt = `LP-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
 // ===== Pickup & delivery time slots =====
-// Fixed slot windows (store is open 5AM–11PM). Every day offers the same
-// 7 standard windows + a special 9PM last slot. Each window's capacity is
-// the number of riders that day (managed in admin.html) — the form reads it
-// from the `cap` in ?action=slots; full slots come back disabled.
-const SLOTS = [
+// Weekdays run 8AM–9PM (last slot 8:30–9:00 PM); weekends run 9AM–7PM only
+// (last slot 6:30–7:00 PM). Each window's capacity is the number of riders
+// that day (managed in admin.html) — the form reads it from the `cap` in
+// ?action=slots; full slots come back disabled.
+const WEEKDAY_SLOTS = [
   { v: "08:00", label: "8:00–9:00 AM" },
   { v: "09:00", label: "9:00–10:30 AM" },
   { v: "11:00", label: "11:00–12:30 PM" },
@@ -1138,28 +1141,37 @@ const SLOTS = [
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
   { v: "19:00", label: "7:00–8:30 PM" },
-  { v: "21:00", label: "9:00 PM", special: true }, // last slot, limited
+  { v: "20:30", label: "8:30–9:00 PM" }, // weekday last slot
 ];
-const ALL_SLOT_VALUES = SLOTS.map(s => s.v);
-const slotByV = v => SLOTS.find(s => s.v === v);
+const WEEKEND_SLOTS = [
+  { v: "09:00", label: "9:00–10:30 AM" },
+  { v: "11:00", label: "11:00–12:30 PM" },
+  { v: "13:00", label: "1:00–2:30 PM" },
+  { v: "15:00", label: "3:00–4:30 PM" },
+  { v: "17:00", label: "5:00–6:30 PM" },
+  { v: "18:30", label: "6:30–7:00 PM" }, // weekend last slot (closes 7PM)
+];
+const isWeekendISO = iso => { const day = new Date(iso + "T00:00:00").getDay(); return day === 0 || day === 6; };
+const slotsForISO = iso => isWeekendISO(iso) ? WEEKEND_SLOTS : WEEKDAY_SLOTS;
 
-// Rush / Super Rush same-day delivery — fixed lookup: pickup slot → allowed
-// delivery slots. Empty ⇒ no same-day slot (delivery via Lalamove).
-// 21:00 is always the optional/last-resort slot (shown with a Limited badge).
+// Rush / Super Rush SAME-DAY delivery — fixed lookup: pickup slot → allowed
+// same-day delivery slots. Empty ⇒ no same-day slot (delivery via Lalamove).
+// Results are intersected with the day's real slots, so weekend same-day
+// bookings never offer a slot the weekend schedule doesn't have.
 const DELIVERY_LOOKUP = {
   rush: {
-    "08:00": ["17:00", "19:00", "21:00"],
-    "09:00": ["19:00", "21:00"],
-    "11:00": ["21:00"],
-    "13:00": [], "15:00": [], "17:00": [], "19:00": [], "21:00": [],
+    "08:00": ["17:00", "19:00", "20:30"],
+    "09:00": ["19:00", "20:30"],
+    "11:00": ["20:30"],
+    "13:00": [], "15:00": [], "17:00": [], "19:00": [], "20:30": [], "18:30": [],
   },
   superrush: {
-    "08:00": ["13:00", "15:00", "17:00", "19:00", "21:00"],
-    "09:00": ["15:00", "17:00", "19:00", "21:00"],
-    "11:00": ["17:00", "19:00", "21:00"],
-    "13:00": ["19:00", "21:00"],
-    "15:00": ["21:00"],
-    "17:00": [], "19:00": [], "21:00": [],
+    "08:00": ["13:00", "15:00", "17:00", "19:00", "20:30"],
+    "09:00": ["15:00", "17:00", "19:00", "20:30"],
+    "11:00": ["17:00", "19:00", "20:30"],
+    "13:00": ["19:00", "20:30"],
+    "15:00": ["20:30"],
+    "17:00": [], "19:00": [], "20:30": [], "18:30": [],
   },
 };
 
@@ -1186,10 +1198,10 @@ async function fetchSlotCounts(date) {
   }
 }
 
-// Render the given slot values into a <select>, honouring today's 1-hour
-// notice and per-slot availability. Special slots (9PM) get a Limited badge.
-async function refreshSlots(dateInput, timeSelect, values) {
-  values = values || ALL_SLOT_VALUES;
+// Render the date's slots into a <select>, honouring today's 1-hour notice
+// and per-slot availability. `allow` (optional) restricts to a subset of slot
+// values (used by same-day Rush delivery) — non-matching slots are hidden.
+async function refreshSlots(dateInput, timeSelect, allow) {
   if (!dateInput.value) {
     timeSelect.innerHTML = `<option value="" selected disabled>Choose a date first</option>`;
     return;
@@ -1201,16 +1213,15 @@ async function refreshSlots(dateInput, timeSelect, values) {
   const avail = await fetchSlotCounts(dateInput.value);
   let html = `<option value="" disabled>Choose a time slot</option>`;
   let anyOpen = false, keptPrev = false;
-  for (const v of values) {
-    const slot = slotByV(v);
-    if (!slot) continue;
+  for (const slot of slotsForISO(dateInput.value)) {
+    const v = slot.v;
+    if (allow && allow.indexOf(v) === -1) continue;
     if (isToday && parseInt(v, 10) <= today.getHours()) continue; // needs an hour's notice
     const full = !!(avail && avail.counts && avail.counts[v] >= (avail.cap || 99));
     const sel = prev === v && !full;
     if (sel) keptPrev = true;
     if (!full) anyOpen = true;
-    const tail = full ? " — FULL" : (slot.special ? " ⚠️ (Limited)" : "");
-    html += `<option value="${v}" ${full ? "disabled" : ""}${sel ? " selected" : ""}>${slot.label}${tail}</option>`;
+    html += `<option value="${v}" ${full ? "disabled" : ""}${sel ? " selected" : ""}>${slot.label}${full ? " — FULL" : ""}</option>`;
   }
   if (!anyOpen) html = `<option value="" selected disabled>No slots left — pick another date</option>`;
   timeSelect.innerHTML = html;
@@ -1234,9 +1245,12 @@ function fillDateSelect(sel, fromDate, placeholder) {
 }
 const chosenSpeed = () => SPEEDS.find(s => s.id === document.querySelector("input[name=speed]:checked").value);
 
-// Delivery scheduling. Standard / 24 Hours: pick any slot on a later day
-// (pickup + speed.days). Rush / Super Rush: same-day, slots come from the
-// fixed DELIVERY_LOOKUP; when none apply, delivery is via Lalamove.
+// Delivery scheduling.
+//  • Standard / 24 Hours: any slot on a later day (pickup + speed.days).
+//  • Rush / Super Rush: delivery date is NOT locked — the customer may pick
+//    the pickup day OR a later day. Only when the SAME day is chosen do the
+//    fixed same-day rules apply (DELIVERY_LOOKUP; Lalamove if no slot fits).
+//    A later delivery day offers that day's slots freely.
 function refreshDeliveryDates() {
   const sp = chosenSpeed();
   lalamoveNote.style.display = "none";
@@ -1246,32 +1260,42 @@ function refreshDeliveryDates() {
     return;
   }
   if (sp.sameDay) {
-    // delivery is the same day as pickup — lock the date to it
-    deliveryDate.innerHTML = `<option value="${pickupDate.value}" selected>${fmtDate(new Date(pickupDate.value + "T00:00:00"))}</option>`;
-    deliveryDate.value = pickupDate.value;
+    // dates from the pickup day onward (same-day allowed, but not forced)
+    fillDateSelect(deliveryDate, new Date(pickupDate.value + "T00:00:00"), "Choose delivery date");
     refreshRushDelivery(sp);
   } else {
     const from = new Date(pickupDate.value + "T00:00:00");
     from.setDate(from.getDate() + (sp.days || 1));
     fillDateSelect(deliveryDate, from, "Choose delivery date");
-    refreshSlots(deliveryDate, deliveryTime, ALL_SLOT_VALUES);
+    refreshSlots(deliveryDate, deliveryTime);
   }
 }
 
+// Rush / Super Rush delivery-time handling for the currently chosen date.
 function refreshRushDelivery(sp) {
-  if (!pickupTime.value) {
-    deliveryTime.innerHTML = `<option value="" selected disabled>Choose pickup time first</option>`;
-    lalamoveNote.style.display = "none";
+  lalamoveNote.style.display = "none";
+  if (!deliveryDate.value) {
+    deliveryTime.innerHTML = `<option value="" selected disabled>Choose delivery date</option>`;
     return;
   }
-  const allowed = DELIVERY_LOOKUP[sp.id][pickupTime.value] || [];
+  if (deliveryDate.value !== pickupDate.value) {
+    // later day → normal free slots for that day
+    refreshSlots(deliveryDate, deliveryTime);
+    return;
+  }
+  // same day as pickup → apply the fixed same-day rules
+  if (!pickupTime.value) {
+    deliveryTime.innerHTML = `<option value="" selected disabled>Choose pickup time first</option>`;
+    return;
+  }
+  const daySlots = slotsForISO(deliveryDate.value).map(s => s.v);
+  const allowed = (DELIVERY_LOOKUP[sp.id][pickupTime.value] || []).filter(v => daySlots.indexOf(v) !== -1);
   if (allowed.length === 0) {
     // no same-day slot for this pickup time → Lalamove
     deliveryTime.innerHTML = `<option value="Lalamove" selected>Delivery via Lalamove</option>`;
     deliveryTime.value = "Lalamove";
     lalamoveNote.style.display = "";
   } else {
-    lalamoveNote.style.display = "none";
     refreshSlots(deliveryDate, deliveryTime, allowed);
   }
 }
@@ -1283,7 +1307,8 @@ pickupDate.addEventListener("change", () => {
 pickupTime.addEventListener("change", refreshDeliveryDates);
 deliveryDate.addEventListener("change", () => {
   const sp = chosenSpeed();
-  if (!sp.sameDay) refreshSlots(deliveryDate, deliveryTime, ALL_SLOT_VALUES);
+  if (sp.sameDay) refreshRushDelivery(sp);
+  else refreshSlots(deliveryDate, deliveryTime);
 });
 document.getElementById("speeds").addEventListener("change", refreshDeliveryDates);
 
