@@ -144,6 +144,13 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
 .pf-row #pType { flex: 1.2; }
 .pf-row #pValue { flex: 1; }
 .pf-lbl { font-size: 11px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.pf-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; cursor: pointer; }
+.pf-check input { width: 16px; height: 16px; accent-color: var(--pink); }
+.pcode .use { font-size: 11px; font-weight: 800; color: #6aa9c9; }
+.pcode .use.full { color: var(--red); }
+.pcode .once { font-size: 10px; font-weight: 800; color: var(--pink); background: #fdf1f7; border-radius: 999px; padding: 1px 7px; }
+.pcode .rst { border: 2px solid #cdeaf8; background: transparent; color: #6aa9c9; font-family: var(--body); font-weight: 800; font-size: 12px; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.pcode .rst:hover { border-color: var(--sky-deep); color: var(--sky-deep); }
 .promoform select {
   font-family: var(--body); font-weight: 700; font-size: 14px; color: var(--ink-deep);
   background: #eef8fd; border: 2px solid #cdeaf8; border-radius: 12px;
@@ -243,10 +250,15 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
         <label class="pf-lbl" for="pUntil">Valid until (optional)</label>
         <input type="date" id="pUntil">
       </div>
+      <div class="pf-row">
+        <label class="pf-lbl" for="pMaxUses">Max uses (0 = ∞)</label>
+        <input type="number" id="pMaxUses" min="0" step="1" placeholder="0">
+        <label class="pf-check"><input type="checkbox" id="pOnce"> Once per customer</label>
+      </div>
       <button class="btn" id="savePromo">Add / Update Code</button>
     </div>
     <div class="promolist" id="promoList"><div class="msg">Enter your admin key to load promo codes.</div></div>
-    <div class="legend">Add or update a code (same code overwrites). ON/OFF toggles whether the form accepts it; ✕ deletes it. Expired or OFF codes are rejected on the form.</div>
+    <div class="legend">Add or update a code (same code overwrites). ON/OFF toggles acceptance; ↺ resets the used count; ✕ deletes it. Max uses 0 = unlimited. "1×/cust" = usable once per phone/email. Expired, OFF, or used-up codes are rejected on the form.</div>
   </div>
 
   <footer>LAUNDRY+ ・ ADMIN</footer>
@@ -447,11 +459,16 @@ function renderPromos(promos) {
     const expired = p.validUntil && p.validUntil < todayISO;
     const disc = p.type === "fixed" ? `₱${p.value} off` : `${p.value}% off`;
     const until = p.validUntil ? `until ${p.validUntil}${expired ? " — EXPIRED" : ""}` : "no expiry";
-    return `<div class="pcode ${p.active ? "" : "off"} ${expired ? "expired" : ""}">
+    const maxed = p.maxUses > 0 && p.usedCount >= p.maxUses;
+    const uses = p.maxUses > 0 ? `used ${p.usedCount}/${p.maxUses}${maxed ? " — USED UP" : ""}` : `used ${p.usedCount} (∞)`;
+    return `<div class="pcode ${p.active ? "" : "off"} ${expired || maxed ? "expired" : ""}">
       <span class="c">${esc(p.code)}</span>
       <span class="d">${disc}</span>
       <span class="u ${expired ? "exp" : ""}">${until}</span>
+      ${p.oncePerCustomer ? `<span class="once">1×/cust</span>` : ""}
+      <span class="use ${maxed ? "full" : ""}">${uses}</span>
       <span class="sp">
+        <button class="rst" data-code="${esc(p.code)}" data-op="reset" title="Reset used count">↺</button>
         <button class="tgl ${p.active ? "on" : ""}" data-code="${esc(p.code)}" data-op="toggle">${p.active ? "ON" : "OFF"}</button>
         <button class="del" data-code="${esc(p.code)}" data-op="delete">✕</button>
       </span>
@@ -475,12 +492,13 @@ document.getElementById("savePromo").addEventListener("click", async () => {
     action: "promo", op: "save", key: localStorage.getItem("lpAdminKey"),
     code, type: document.getElementById("pType").value,
     value, validUntil: document.getElementById("pUntil").value, active: true,
+    maxUses: parseInt(document.getElementById("pMaxUses").value, 10) || 0,
+    oncePerCustomer: document.getElementById("pOnce").checked,
   }).catch(() => ({ ok: false }));
   promoBusy = false;
   if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); return; }
-  document.getElementById("pCode").value = "";
-  document.getElementById("pValue").value = "";
-  document.getElementById("pUntil").value = "";
+  ["pCode", "pValue", "pUntil", "pMaxUses"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("pOnce").checked = false;
   renderPromos(data.promos || []);
 });
 
@@ -488,6 +506,7 @@ promoListEl.addEventListener("click", async e => {
   const btn = e.target.closest("[data-op]");
   if (!btn || promoBusy) return;
   if (btn.dataset.op === "delete" && !confirm(`Delete code ${btn.dataset.code}?`)) return;
+  if (btn.dataset.op === "reset" && !confirm(`Reset used count for ${btn.dataset.code} to 0?`)) return;
   promoBusy = true;
   btn.textContent = "…";
   const data = await promoPost({
