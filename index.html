@@ -81,21 +81,16 @@ header { text-align: center; padding: 44px 0 8px; }
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: clamp(44px, 11vw, 60px);
-  line-height: 1;
-  letter-spacing: .01em;
+  justify-content: center;
 }
-.logo .plus {
-  font-size: .55em;
-  vertical-align: super;
-  position: relative;
-  top: -.55em;
-  margin-left: 2px;
+/* brand mark is a black PNG (assets/logo-black.png); inverted to white for
+   this blue header — keep the source file black-on-transparent for reuse
+   on white backgrounds (README, favicon) without needing a second asset */
+.logo-img {
+  height: clamp(36px, 11vw, 64px); /* floor stays >=32px on the smallest phones */
+  width: auto;
+  filter: brightness(0) invert(1);
 }
-.logo svg { width: .82em; height: .82em; }
 .tag {
   display: flex;
   align-items: center;
@@ -705,12 +700,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 <main>
   <header>
     <div class="logo">
-      <svg viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="9"/>
-        <path d="M24 58 Q50 82 76 52 Q66 64 46 60 Q32 57 24 58 Z" fill="#fff"/>
-        <circle cx="63" cy="38" r="6" fill="#fff"/>
-      </svg>
-      <span>Laundry<span class="plus">+</span></span>
+      <img src="assets/logo-black.png" alt="Laundry+" class="logo-img">
     </div>
     <div class="tag">Wash + Dry + Fold</div>
     <div class="subrow">
