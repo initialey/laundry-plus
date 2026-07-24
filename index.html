@@ -735,7 +735,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="pr"><span class="num">240</span><span class="per">PHP</span></div>
     </div>
     <div class="prow">
-      <div class="pl">↳ Additional Weight <small>(+₱45/kg, pricing applies up to 12kg only)</small></div>
+      <div class="pl">↳ Additional Weight <small>(+₱45/kg, applies up to 12kg only)</small></div>
       <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
     </div>
     <div class="prow">
@@ -873,8 +873,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
         <p>"Laundry+ is not liable for color bleeding, shrinkage, fading, or damage to delicate or unlabeled garments resulting from standard washing, drying, or pressing. By booking, you confirm that your items are suitable for standard laundry processing unless special handling is requested."</p>
         <p lang="tl">"Hindi mananagot ang Laundry+ sa pagbleed ng kulay, pag-shrink, pagkupas, o pagkasira ng delicate o walang label na damit dulot ng standard na paglaba, pagdry, o pagpress. Sa pag-book, kinukumpirma mo na angkop ang mga gamit mo para sa standard laundry processing maliban kung humingi ka ng special handling."</p>
       </details>
-      <p class="tncprompt">Have delicate items (silk, embellished, hand-wash only, etc.)? <button type="button" class="linklike" id="gotoNotes">Let us know in the notes above</button> so we can give them special care.<br>
-      <span lang="tl">May delicate items ka ba (silk, may beads/embellishments, hand-wash only, etc.)? <button type="button" class="linklike" id="gotoNotesTl">Isulat sa notes</button> para maalagaan namin ng maayos.</span></p>
+      <p class="tncprompt">Have delicate items (silk, embellished, etc.)? <button type="button" class="linklike" id="gotoNotes">Let us know in the notes above</button> so we can give them special care.<br>
+      <span lang="tl">May delicate items ka ba (silk, may beads/embellishments, etc.)? <button type="button" class="linklike" id="gotoNotesTl">Isulat sa notes</button> para maalagaan namin ng maayos.</span></p>
     </div>
 
     <button type="submit" class="submit" id="submitBtn" disabled>Book for Pickup 🧺</button>
@@ -903,8 +903,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 // ===== Pricing master (sync with GAS sheet later) =====
 // model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
-  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 up to 7kg +₱45/kg (max 12kg/load)" },
-  { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 per 5kg load" },
+  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 up to 7kg +₱45/kg (max 12kg)" },
+  { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 max 5kg/load" },
   { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
   { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg/load)" },
   { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg/load)" },
@@ -1141,7 +1141,7 @@ const WEEKDAY_SLOTS = [
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
   { v: "19:00", label: "7:00–8:30 PM" },
-  { v: "20:30", label: "8:30–9:00 PM" }, // weekday last slot
+  { v: "20:30", label: "8:30–9:00 PM", special: true }, // weekday last slot — near rider off-time, kept limited
 ];
 const WEEKEND_SLOTS = [
   { v: "09:00", label: "9:00–10:30 AM" },
@@ -1149,7 +1149,7 @@ const WEEKEND_SLOTS = [
   { v: "13:00", label: "1:00–2:30 PM" },
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
-  { v: "18:30", label: "6:30–7:00 PM" }, // weekend last slot (closes 7PM)
+  { v: "18:30", label: "6:30–7:00 PM", special: true }, // weekend last slot — near rider off-time, kept limited
 ];
 const isWeekendISO = iso => { const day = new Date(iso + "T00:00:00").getDay(); return day === 0 || day === 6; };
 const slotsForISO = iso => isWeekendISO(iso) ? WEEKEND_SLOTS : WEEKDAY_SLOTS;
@@ -1221,7 +1221,8 @@ async function refreshSlots(dateInput, timeSelect, allow) {
     const sel = prev === v && !full;
     if (sel) keptPrev = true;
     if (!full) anyOpen = true;
-    html += `<option value="${v}" ${full ? "disabled" : ""}${sel ? " selected" : ""}>${slot.label}${full ? " — FULL" : ""}</option>`;
+    const tail = full ? " — FULL" : (slot.special ? " ⚠️ (Limited)" : "");
+    html += `<option value="${v}" ${full ? "disabled" : ""}${sel ? " selected" : ""}>${slot.label}${tail}</option>`;
   }
   if (!anyOpen) html = `<option value="" selected disabled>No slots left — pick another date</option>`;
   timeSelect.innerHTML = html;
