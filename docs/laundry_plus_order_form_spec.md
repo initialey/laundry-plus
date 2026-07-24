@@ -242,4 +242,25 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 - `GET ?action=slots&date=` … スロット空き状況(公開)/ `GET ?action=day&date=&key=` … 管理画面用の予約一覧(要ADMIN_KEY)/ `POST {action:"block"}` … スロットのBLOCK/UNBLOCK。
 - `GET ?action=promo&code=` … プロモコード検証(公開)/ `GET ?action=promos&key=` … コード一覧(要ADMIN_KEY)/ `POST {action:"promo", op:"save"|"toggle"|"delete"}` … コード管理。PromoCodesシートに保存。
 - `GET ?action=riders&date=&key=` … その日のライダー人数取得(要ADMIN_KEY)/ `POST {action:"riders", date, count}` … 人数設定。Ridersシートに保存(DEFAULT値を設定すると行は削除)。
-- `setupSheet()` は Orders / BlockedSlots / PromoCodes / Riders の各シートを作成。
+- `GET ?action=riderRoster&key=` … ライダー名簿取得(要ADMIN_KEY)/ `POST {action:"riderRoster", op:"save"|"toggle"|"delete", riderId?, name, chatId, baseAddress}` … 名簿の登録・編集・有効/無効切替・削除。RiderRosterシートに保存(住所変更時のみ再ジオコード)。
+- `GET ?action=riderSchedule&date=&key=` … 指定日の全ライダーと出勤状況(要ADMIN_KEY)/ `POST {action:"riderSchedule", date, entries:[{riderId, onDuty}]}` … その日の出勤を保存(RiderScheduleシート、同日は上書き)。
+- `POST {action:"reassignRider", receiptNo, riderId}` … 注文の担当ライダーを手動で再アサインし、新しい担当者にTelegram再通知(要ADMIN_KEY)。
+- `setupSheet()` は Orders / BlockedSlots / PromoCodes / Riders / RiderRoster / RiderSchedule の各シートを作成。
+
+### §8.1 ライダー自動アサイン機能
+
+- 注文が確定すると、住所を Google Geocoding API で座標変換し、その日 **Active かつ出勤中(On Duty)** のライダーのうち
+  拠点座標から直線距離(Haversine)が最も近い1人へ自動アサインする。
+- Ordersシートに `Assigned Rider` / `Rider ID` / `Distance (km)` / `Assigned At` の4列を追加記録し、
+  アサインされたライダーへ以下のフォーマットでTelegram通知を送信する:
+  ```
+  🛵 New Order Assigned!
+  👤 Customer: [名前] 📍 Address: [住所] 📦 Order: [サービス内容] 🕐 Pickup: [日時] 🕐 Delivery: [日時] 💰 Total: ₱[金額]
+  📌 Map: https://maps.google.com/?q=[緯度],[経度]
+  ```
+- 住所が座標変換できない場合、またはその日 出勤中のライダーが0人の場合は `未アサイン` として記録し、
+  注文自体の記録・オーナーへの既存通知は通常どおり行われる(アサイン処理の失敗が注文記録をブロックしない)。
+  出勤中ライダーが0人のときはオーナーのTelegramに `⚠️ No riders on duty today!` を送信する。
+  Script Properties に `GEOCODING_API_KEY` が未設定の場合も同様に `未アサイン` になる。
+  座標変換に失敗した場合(住所不明・APIエラー)は自動アサインをスキップするのみで、注文の記録・通知は継続する。
+- admin.html の Riders パネルからライダー名簿の登録・編集・出勤管理・手動での再アサインができる(§「管理画面」参照)。

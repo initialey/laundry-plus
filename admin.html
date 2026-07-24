@@ -185,6 +185,24 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
 }
 .rbtn.active { border-color: var(--sky); background: #fff; color: var(--sky-deep); box-shadow: 0 3px 0 rgba(63,180,230,.3); }
 .rbtn:disabled { opacity: .5; cursor: wait; }
+.subhead { font-family: var(--display); font-weight: 800; font-size: 15px; color: var(--sky-deep); margin: 16px 0 8px; }
+.subhead:first-of-type { margin-top: 0; }
+.rosterform { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.rosterform .btnrow { display: flex; gap: 8px; }
+.rosterform .btnrow .btn { flex: 1; }
+.rosterform .btnrow .cancel { background: transparent; border: 2px solid #cdeaf8; color: #6aa9c9; box-shadow: none; display: none; }
+.rosterlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.pcode .edt { border: 2px solid #cdeaf8; background: transparent; color: #6aa9c9; font-family: var(--body); font-weight: 800; font-size: 11px; border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.pcode .edt:hover { border-color: var(--sky-deep); color: var(--sky-deep); }
+.attgrid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.attcard { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 2px solid #cdeaf8; border-radius: 12px; padding: 9px 12px; }
+.attcard .an { font-weight: 700; font-size: 13.5px; color: var(--ink-deep); }
+.attcard .toggle { display: flex; gap: 6px; }
+.attcard .tb { border: 2px solid #cdeaf8; background: transparent; color: #6aa9c9; font-family: var(--body); font-weight: 800; font-size: 12px; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.attcard .tb.on { border-color: var(--green); background: var(--green); color: #fff; }
+.schedrow { display: flex; gap: 8px; align-items: center; }
+.schedresult { font-size: 13px; font-weight: 700; color: var(--ink-deep); margin-top: 8px; }
+.bk select.reassign { font-family: var(--body); font-weight: 700; font-size: 11px; border-radius: 8px; border: 2px solid #cdeaf8; background: #fff; color: var(--ink-deep); padding: 3px 6px; margin-left: auto; max-width: 130px; }
 </style>
 </head>
 <body>
@@ -225,6 +243,38 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
       <button class="rbtn" data-count="2">2 Riders</button>
     </div>
     <div class="legend">Set the rider count for the day shown above (use ‹ › / Today to change the date). Fewer riders ⇒ slots fill sooner on the booking form.</div>
+  </div>
+
+  <div class="card">
+    <div class="riderhead">
+      <h2>Riders</h2>
+      <button class="btn today" id="reloadRoster">Reload</button>
+    </div>
+
+    <div class="subhead">Register a Rider</div>
+    <div class="rosterform">
+      <input type="text" id="rName" placeholder="Name">
+      <input type="text" id="rAddress" placeholder="Base Address">
+      <input type="text" id="rChatId" placeholder="Telegram Chat ID">
+      <div class="btnrow">
+        <button class="btn cancel" id="cancelRiderEdit">Cancel</button>
+        <button class="btn" id="saveRider">Register</button>
+      </div>
+    </div>
+    <div class="rosterlist" id="rosterList"><div class="msg">Enter your admin key to load riders.</div></div>
+
+    <div class="subhead">Today's Attendance — <span id="attToday"></span></div>
+    <div class="attgrid" id="attendanceList"><div class="msg">Enter your admin key to load riders.</div></div>
+    <button class="btn" id="saveAttendance">Save Attendance</button>
+
+    <div class="subhead">Check Another Day</div>
+    <div class="schedrow">
+      <input type="date" id="schedDate">
+      <button class="btn today" id="checkSched">Check</button>
+    </div>
+    <div class="schedresult" id="schedResult"></div>
+
+    <div class="legend">Only active riders appear for daily attendance and auto-assignment. Reassign an order's rider directly from its booking row below.</div>
   </div>
 
   <div class="card">
@@ -301,7 +351,7 @@ let busy = false;
 keyInput.value = localStorage.getItem("lpAdminKey") || "";
 document.getElementById("saveKey").addEventListener("click", () => {
   localStorage.setItem("lpAdminKey", keyInput.value.trim());
-  load();
+  loadRoster().finally(() => { load(); loadAttendanceToday(); });
   loadPromos();
 });
 keyInput.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("saveKey").click(); });
@@ -401,6 +451,10 @@ async function load() {
           <span>${esc(b.name)}</span>
           <a href="tel:${esc(b.phone)}">${esc(b.phone)}</a>
           <span class="rc">${esc(b.receipt)} · ${esc(b.speed)} · ${esc(b.status)}</span>
+          <select class="reassign" data-receipt="${esc(b.receipt)}">
+            <option value="">Unassigned</option>
+            ${riderRoster.filter(r => r.active).map(r => `<option value="${esc(r.riderId)}" ${r.riderId === b.riderId ? "selected" : ""}>${esc(r.name || r.riderId)}</option>`).join("")}
+          </select>
         </div>`).join("") + `</div>` : ""}
     </div>`;
   }
@@ -431,6 +485,218 @@ slotsEl.addEventListener("click", async e => {
     busy = false;
     load();
   }
+});
+
+slotsEl.addEventListener("change", async e => {
+  const sel = e.target.closest(".reassign");
+  if (!sel || !sel.value) return;
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); load(); return; }
+  sel.disabled = true;
+  const data = await ridersPost({
+    action: "reassignRider", key, receiptNo: sel.dataset.receipt, riderId: sel.value,
+  }).catch(() => ({ ok: false }));
+  if (!data.ok) alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong.");
+  load();
+});
+
+// ===== Rider roster & attendance =====
+const rosterListEl = document.getElementById("rosterList");
+const attendanceListEl = document.getElementById("attendanceList");
+const attTodayEl = document.getElementById("attToday");
+const schedResultEl = document.getElementById("schedResult");
+const todayISOforAtt = toISODate(new Date());
+document.getElementById("schedDate").value = todayISOforAtt;
+attTodayEl.textContent = todayISOforAtt;
+
+let riderRoster = []; // cached roster rows, shared with the booking reassign dropdown
+let attendanceState = {}; // riderId -> bool, local edits before "Save Attendance"
+let editingRiderId = null;
+let rosterBusy = false;
+
+async function ridersGet(action, extra) {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  const params = new URLSearchParams(Object.assign({ action, key }, extra || {}));
+  const res = await fetch(`${GAS_ENDPOINT}?${params.toString()}`);
+  return res.json();
+}
+async function ridersPost(body) {
+  const res = await fetch(GAS_ENDPOINT, { method: "POST", body: JSON.stringify(body) });
+  return res.json();
+}
+
+async function loadRoster() {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { rosterListEl.innerHTML = `<div class="msg">Enter your admin key to load riders.</div>`; return; }
+  rosterListEl.innerHTML = `<div class="msg">Loading…</div>`;
+  let data;
+  try {
+    data = await ridersGet("riderRoster");
+  } catch (err) {
+    rosterListEl.innerHTML = `<div class="msg err">Couldn't reach the server.</div>`;
+    return;
+  }
+  if (!data.ok) { rosterListEl.innerHTML = `<div class="msg err">Wrong admin key.</div>`; return; }
+  riderRoster = data.roster || [];
+  renderRoster();
+  renderAttendance();
+}
+
+function renderRoster() {
+  if (!riderRoster.length) { rosterListEl.innerHTML = `<div class="msg">No riders yet. Register one above.</div>`; return; }
+  rosterListEl.innerHTML = riderRoster.map(r => `
+    <div class="pcode ${r.active ? "" : "off"}">
+      <span class="c">${esc(r.name || "(no name)")}</span>
+      <span class="d">${esc(r.baseAddress || "no base address")}</span>
+      <span class="sp">
+        <button class="edt" data-rid="${esc(r.riderId)}" data-op="edit">Edit</button>
+        <button class="tgl ${r.active ? "on" : ""}" data-rid="${esc(r.riderId)}" data-op="toggle">${r.active ? "ON" : "OFF"}</button>
+        <button class="del" data-rid="${esc(r.riderId)}" data-op="delete">✕</button>
+      </span>
+    </div>`).join("");
+}
+
+function cancelRiderEdit() {
+  editingRiderId = null;
+  document.getElementById("rName").value = "";
+  document.getElementById("rAddress").value = "";
+  document.getElementById("rChatId").value = "";
+  document.getElementById("saveRider").textContent = "Register";
+  document.getElementById("cancelRiderEdit").style.display = "none";
+}
+document.getElementById("cancelRiderEdit").addEventListener("click", cancelRiderEdit);
+
+document.getElementById("saveRider").addEventListener("click", async () => {
+  if (rosterBusy) return;
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); return; }
+  const name = document.getElementById("rName").value.trim();
+  const baseAddress = document.getElementById("rAddress").value.trim();
+  const chatId = document.getElementById("rChatId").value.trim();
+  if (!name) { alert("Enter a rider name."); return; }
+  rosterBusy = true;
+  const btn = document.getElementById("saveRider");
+  const prevLabel = btn.textContent; btn.textContent = "…";
+  const data = await ridersPost({
+    action: "riderRoster", op: "save", key,
+    riderId: editingRiderId || undefined,
+    name, baseAddress, chatId, active: true,
+  }).catch(() => ({ ok: false }));
+  rosterBusy = false;
+  btn.textContent = prevLabel;
+  if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); return; }
+  cancelRiderEdit();
+  riderRoster = data.roster || [];
+  renderRoster();
+  renderAttendance();
+});
+
+rosterListEl.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-op]");
+  if (!btn || rosterBusy) return;
+  const riderId = btn.dataset.rid;
+  const op = btn.dataset.op;
+
+  if (op === "edit") {
+    const r = riderRoster.find(x => x.riderId === riderId);
+    if (!r) return;
+    editingRiderId = riderId;
+    document.getElementById("rName").value = r.name || "";
+    document.getElementById("rAddress").value = r.baseAddress || "";
+    document.getElementById("rChatId").value = r.chatId || "";
+    document.getElementById("saveRider").textContent = "Update Rider";
+    document.getElementById("cancelRiderEdit").style.display = "inline-block";
+    document.getElementById("rName").focus();
+    return;
+  }
+  if (op === "delete" && !confirm("Delete this rider?")) return;
+
+  const key = localStorage.getItem("lpAdminKey") || "";
+  rosterBusy = true;
+  btn.textContent = "…";
+  const data = await ridersPost({ action: "riderRoster", op, key, riderId }).catch(() => ({ ok: false }));
+  rosterBusy = false;
+  if (!data.ok) { alert("Something went wrong."); loadRoster(); return; }
+  if (editingRiderId === riderId) cancelRiderEdit();
+  riderRoster = data.roster || [];
+  renderRoster();
+  renderAttendance();
+});
+
+// --- Today's attendance (editable) ---
+function renderAttendance() {
+  if (!riderRoster.filter(r => r.active).length) {
+    attendanceListEl.innerHTML = `<div class="msg">No active riders yet.</div>`;
+    return;
+  }
+  attendanceListEl.innerHTML = riderRoster.filter(r => r.active).map(r => {
+    const on = !!attendanceState[r.riderId];
+    return `<div class="attcard">
+      <span class="an">${esc(r.name || r.riderId)}</span>
+      <span class="toggle">
+        <button class="tb ${on ? "on" : ""}" data-rid="${esc(r.riderId)}" data-val="1">On Duty</button>
+        <button class="tb ${!on ? "on" : ""}" data-rid="${esc(r.riderId)}" data-val="0">Off</button>
+      </span>
+    </div>`;
+  }).join("");
+}
+
+attendanceListEl.addEventListener("click", e => {
+  const btn = e.target.closest(".tb");
+  if (!btn) return;
+  attendanceState[btn.dataset.rid] = btn.dataset.val === "1";
+  renderAttendance();
+});
+
+async function loadAttendanceToday() {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) return;
+  let data;
+  try {
+    data = await ridersGet("riderSchedule", { date: todayISOforAtt });
+  } catch (err) {
+    return;
+  }
+  if (!data.ok) return;
+  attendanceState = {};
+  (data.riders || []).forEach(r => { attendanceState[r.riderId] = !!r.onDuty; });
+  renderAttendance();
+}
+
+document.getElementById("saveAttendance").addEventListener("click", async () => {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); return; }
+  const btn = document.getElementById("saveAttendance");
+  const prev = btn.textContent; btn.textContent = "Saving…"; btn.disabled = true;
+  const entries = riderRoster.filter(r => r.active).map(r => ({ riderId: r.riderId, onDuty: !!attendanceState[r.riderId] }));
+  const data = await ridersPost({ action: "riderSchedule", key, date: todayISOforAtt, entries }).catch(() => ({ ok: false }));
+  btn.textContent = prev; btn.disabled = false;
+  if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); return; }
+  alert(`Saved — ${data.onDutyCount} rider(s) on duty for ${todayISOforAtt}.`);
+});
+
+// --- Schedule lookup (any date, read-only) ---
+document.getElementById("checkSched").addEventListener("click", async () => {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); return; }
+  const date = document.getElementById("schedDate").value;
+  if (!date) return;
+  schedResultEl.textContent = "Loading…";
+  let data;
+  try {
+    data = await ridersGet("riderSchedule", { date });
+  } catch (err) {
+    schedResultEl.textContent = "Couldn't reach the server.";
+    return;
+  }
+  if (!data.ok) { schedResultEl.textContent = "Wrong admin key."; return; }
+  const total = (data.riders || []).length;
+  schedResultEl.textContent = `${data.onDutyCount}/${total} riders on duty on ${date}.`;
+});
+
+document.getElementById("reloadRoster").addEventListener("click", () => {
+  loadRoster();
+  loadAttendanceToday();
 });
 
 // ===== Promo codes =====
@@ -519,7 +785,7 @@ promoListEl.addEventListener("click", async e => {
 
 document.getElementById("reloadPromos").addEventListener("click", loadPromos);
 
-load();
+loadRoster().finally(() => { load(); loadAttendanceToday(); });
 loadPromos();
 </script>
 </body>
