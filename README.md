@@ -39,6 +39,12 @@
 - スロット単位で **BLOCK / UNBLOCK** — ブロックしたスロットは予約フォームで FULL 表示になり選択不可
 - アクセスには管理キーが必要: `gas/Code.gs` の `ADMIN_KEY` を自分だけの値に変更し、admin.html の Key 欄に同じ値を入力(端末に保存されます)
 - ブロック情報はスプレッドシートの `BlockedSlots` シートに保存(直接編集も可)
+- **Riders パネル**(ライダー名簿・出勤管理・自動アサイン)
+  - ①ライダー登録: 名前・拠点住所・Telegram Chat ID を入力して登録。既存ライダーは Edit で編集、ON/OFF で有効/無効切替、✕ で削除
+  - ②本日の出勤管理: 有効なライダーがカード表示され、On Duty / Off をトグルして Save Attendance で保存(`RiderSchedule` シートに記録)
+  - ③別日の出勤確認: 日付を選んで「N/M riders on duty」を確認(閲覧のみ)
+  - 各予約行にライダー再アサイン用のドロップダウンがあり、選択すると即座に担当ライダーを切り替えて Telegram 再通知
+  - 新規注文は Google Geocoding API で住所を座標変換し、その日出勤中(Active かつ On Duty)のライダーのうち拠点から最も近い1人に自動アサインし、Telegram で通知(出勤ライダーが0人の場合は「未アサイン」で記録し、オーナーに警告通知)
 
 ## 使い方(ローカルで開く)
 
@@ -72,7 +78,8 @@ python3 -m http.server 8787
 1. Googleスプレッドシートを作成 → 拡張機能 → Apps Script
 2. [`gas/Code.gs`](gas/Code.gs) の中身を貼り付けて保存
 3. デプロイ → 新しいデプロイ → 種類「ウェブアプリ」→ アクセス「全員」でデプロイ
-4. 発行されたウェブアプリURLを `index.html` の `GAS_ENDPOINT` に貼り付け
+4. 発行されたウェブアプリURLを `index.html` の `GAS_ENDPOINT` に貼り付け(`admin.html` の `GAS_ENDPOINT` も同じURLに更新)
+5. 自動アサイン機能を使う場合: Apps Script エディタの プロジェクトの設定 → スクリプト プロパティ に `GEOCODING_API_KEY`(Geocoding API を有効にした Google Cloud の API キー)を追加。その後 `setupSheet()` を実行すると `RiderRoster` / `RiderSchedule` シートが作成されるので、admin.html の Riders パネルからライダーを登録・出勤設定する
 
 コードを修正したときは「デプロイ → デプロイを管理 → ✏️編集 → バージョン: 新バージョン → デプロイ」
 で**URLを変えずに**更新できます。

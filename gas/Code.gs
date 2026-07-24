@@ -7,10 +7,19 @@
 // Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
 //
 // NOTE: the column layout changed (FB / Contact Via / Pickup / Delivery /
-// Separation / Add-ons / T&C Agreed / Promo Code / Discount were added).
-// If you already have an "Orders" sheet from an older version, rename it
-// (e.g. "Orders-old") and run setupSheet() again so new orders land under
-// the right headers. setupSheet() also creates the PromoCodes sheet.
+// Separation / Add-ons / T&C Agreed / Promo Code / Discount / Assigned Rider /
+// Rider ID / Distance (km) / Assigned At were added). If you already have an
+// "Orders" sheet from an older version, rename it (e.g. "Orders-old") and
+// run setupSheet() again so new orders land under the right headers.
+// setupSheet() also creates the PromoCodes / Riders / RiderRoster /
+// RiderSchedule sheets.
+//
+// Auto-assign setup: in the Apps Script editor, Project Settings → Script
+// Properties → add GEOCODING_API_KEY (a Google Cloud API key with the
+// Geocoding API enabled — the same project/key you use for Places is fine
+// as long as Geocoding is enabled on it too). Then open admin.html's Riders
+// panel to register riders (name, base address, Telegram chat ID) and mark
+// who's on duty each day.
 
 // ===== Telegram settings =====
 const TELEGRAM_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"; // from @BotFather
@@ -28,6 +37,7 @@ const HEADERS = [
   "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
   "T&C Agreed", "Speed", "Notes", "Promo Code", "Discount", "Total (PHP)",
+  "Assigned Rider", "Rider ID", "Distance (km)", "Assigned At",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -53,11 +63,29 @@ const BLOCKED_SHEET = "BlockedSlots";
 const PROMO_SHEET = "PromoCodes";
 const PROMO_HEADERS = ["Code", "Type", "Value", "Valid Until", "Active", "Notes", "Max Uses", "Used Count", "One Time Per Customer"];
 
+// ===== Rider roster + daily attendance (auto-assign feature) =====
+// IMPORTANT: this is a *different* sheet from "Riders" above. "Riders"
+// (RIDERS_SHEET) only stores a per-day headcount used to compute slot
+// capacity (headcount × SLOTS_PER_RIDER). This roster/attendance system is
+// about WHO the riders are and WHERE they start from, for distance-based
+// order assignment — it's independent and uses its own sheet names so the
+// two features never collide:
+//   RiderRoster   — one row per rider (id, name, Telegram chat id, base
+//                   address + geocoded coords, active flag)
+//   RiderSchedule — one row per (date, rider) marking who's on duty that day
+const RIDER_ROSTER_SHEET = "RiderRoster";
+const RIDER_ROSTER_HEADERS = ["Rider ID", "Name", "Telegram Chat ID", "Base Address", "Base Lat", "Base Lng", "Active"];
+const RIDER_SCHEDULE_SHEET = "RiderSchedule";
+const RIDER_SCHEDULE_HEADERS = ["Date", "Rider ID", "Rider Name", "On Duty", "Registered At"];
+
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   if (data.action === "block") return handleBlock(data); // from admin.html
   if (data.action === "promo") return handlePromo(data); // from admin.html
-  if (data.action === "riders") return handleRiders(data); // from admin.html
+  if (data.action === "riders") return handleRiders(data); // from admin.html (slot-capacity headcount)
+  if (data.action === "riderRoster") return handleRiderRoster(data); // from admin.html (roster CRUD)
+  if (data.action === "riderSchedule") return handleRiderSchedule(data); // from admin.html (daily attendance)
+  if (data.action === "reassignRider") return handleReassignRider(data); // from admin.html (manual reassignment)
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -89,6 +117,18 @@ function doPost(e) {
     }
   }
 
+  // Auto-assign the nearest on-duty rider — best-effort, computed BEFORE the
+  // row is appended so the result lands in the same write (no second pass).
+  // Any failure here (bad API key, geocoding down, etc.) must never stop the
+  // order from being recorded.
+  let assign = { ok: false, reason: "error" };
+  try {
+    const pickupISO = (data.pickup || "").slice(0, 10); // "YYYY-MM-DD HH:MM" -> date part
+    assign = pickRiderForOrder(data.address, pickupISO || todayISODate());
+  } catch (err) {
+    console.error("pickRiderForOrder failed: " + err);
+  }
+
   sheet.appendRow([
     data.receiptNo,
     new Date(data.receivedAt),
@@ -112,6 +152,10 @@ function doPost(e) {
     promoCode,
     discount,
     total,
+    assign.ok ? assign.riderName : "未アサイン",
+    assign.ok ? assign.riderId : "",
+    assign.ok ? assign.distanceKm.toFixed(2) : "",
+    assign.ok ? new Date() : "",
   ]);
 
   // count the use only after the order is safely recorded
@@ -139,6 +183,19 @@ function doPost(e) {
     );
   } catch (err) {
     console.error("Telegram notify failed: " + err);
+  }
+
+  // Rider assignment notification (or a "no one on duty" alert to the
+  // owner) — separate try/catch so it can never affect order recording or
+  // the owner notification above.
+  try {
+    if (assign.ok) {
+      sendTelegramTo(assign.chatId, riderAssignmentMessage(data, assign, loadsText));
+    } else if (assign.reason === "no_riders_on_duty") {
+      sendTelegramTo(TELEGRAM_CHAT_ID, "⚠️ No riders on duty today!");
+    }
+  } catch (err) {
+    console.error("rider assignment notify failed: " + err);
   }
 
   return jsonOut({ ok: true });
@@ -179,6 +236,8 @@ function doGet(e) {
         phone: String(row[idx.phone]),
         speed: String(row[idx.speed]),
         status: String(row[idx.status]),
+        assignedRider: String(row[idx.assignedRider] || ""),
+        riderId: String(row[idx.riderId] || ""),
       });
     });
     return jsonOut({ ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date), blocked: getBlocked(p.date), bookings: bookings });
@@ -188,6 +247,23 @@ function doGet(e) {
   if (p.action === "riders" && p.date) {
     if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
     return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), cap: capacityForDate(p.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
+  }
+
+  // Admin: list the rider roster (name, base address, active, etc.) for admin.html.
+  if (p.action === "riderRoster") {
+    if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+    return jsonOut({ ok: true, roster: readRiderRoster() });
+  }
+
+  // Admin: today's (or any date's) attendance — every roster rider plus
+  // whether they're marked on-duty for that date.
+  if (p.action === "riderSchedule" && p.date) {
+    if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+    const onDuty = onDutyRiderIdsForDate(p.date);
+    const riders = readRiderRoster().map(function (r) {
+      return { riderId: r.riderId, name: r.name, active: r.active, onDuty: onDuty.has(r.riderId) };
+    });
+    return jsonOut({ ok: true, date: p.date, riders: riders, onDutyCount: riders.filter(function (r) { return r.onDuty; }).length });
   }
 
   // Public: validate a promo code entered on the booking form. phone/email
@@ -217,6 +293,8 @@ function forEachBookingOn(date, cb) {
     pickup: HEADERS.indexOf("Pickup"),
     delivery: HEADERS.indexOf("Delivery"),
     speed: HEADERS.indexOf("Speed"),
+    assignedRider: HEADERS.indexOf("Assigned Rider"),
+    riderId: HEADERS.indexOf("Rider ID"),
   };
   const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
   rows.forEach(function (r) {
@@ -321,6 +399,295 @@ function handleBlock(data) {
     }
   }
   return jsonOut({ ok: true, blocked: getBlocked(data.date) });
+}
+
+// ===== Rider roster, attendance & auto-assignment =====
+// See the constants block near the top for why this is a separate sheet
+// pair from "Riders" (slot-capacity headcount).
+
+function todayISODate() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+function getRiderRosterSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(RIDER_ROSTER_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(RIDER_ROSTER_SHEET);
+    sheet.appendRow(RIDER_ROSTER_HEADERS);
+  }
+  return sheet;
+}
+
+function getRiderScheduleSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(RIDER_SCHEDULE_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(RIDER_SCHEDULE_SHEET);
+    sheet.appendRow(RIDER_SCHEDULE_HEADERS);
+  }
+  return sheet;
+}
+
+// Returns [{ riderId, name, chatId, baseAddress, baseLat, baseLng, active }]
+function readRiderRoster() {
+  const sheet = getRiderRosterSheet();
+  const out = [];
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, RIDER_ROSTER_HEADERS.length).getValues().forEach(function (r) {
+      if (!String(r[0]).trim()) return;
+      out.push({
+        riderId: String(r[0]).trim(),
+        name: String(r[1] || ""),
+        chatId: String(r[2] || ""),
+        baseAddress: String(r[3] || ""),
+        baseLat: r[4] === "" ? null : Number(r[4]),
+        baseLng: r[5] === "" ? null : Number(r[5]),
+        active: promoTruthy(r[6]),
+      });
+    });
+  }
+  return out;
+}
+
+// "rider_1", "rider_2", ... — next unused id in the roster.
+function nextRiderId() {
+  const used = readRiderRoster().map(function (r) { return r.riderId; });
+  let n = 1;
+  while (used.indexOf("rider_" + n) !== -1) n++;
+  return "rider_" + n;
+}
+
+// Geocode a free-text address via the Google Geocoding API.
+// Returns { lat, lng } or null (missing key / no match / request failure).
+function geocodeAddress(address) {
+  const key = PropertiesService.getScriptProperties().getProperty("GEOCODING_API_KEY");
+  if (!key || !address) return null;
+  const url = "https://maps.googleapis.com/maps/api/geocode/json?address="
+    + encodeURIComponent(address) + "&key=" + encodeURIComponent(key);
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const json = JSON.parse(res.getContentText());
+    if (json.status !== "OK" || !json.results || !json.results.length) {
+      console.error("Geocoding failed for '" + address + "': " + json.status);
+      return null;
+    }
+    const loc = json.results[0].geometry.location;
+    return { lat: loc.lat, lng: loc.lng };
+  } catch (err) {
+    console.error("Geocoding request failed: " + err);
+    return null;
+  }
+}
+
+// Great-circle distance in km between two lat/lng points.
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Earth radius, km
+  const toRad = function (d) { return d * Math.PI / 180; };
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Rider IDs marked On Duty=TRUE for a given date (most recent row per
+// rider/date wins, in case attendance was toggled more than once).
+function onDutyRiderIdsForDate(date) {
+  const sheet = getRiderScheduleSheet();
+  const state = {}; // riderId -> boolean, last value seen wins
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, RIDER_SCHEDULE_HEADERS.length).getValues().forEach(function (r) {
+      if (String(r[0]) !== date) return;
+      state[String(r[1])] = promoTruthy(r[3]);
+    });
+  }
+  const out = new Set();
+  Object.keys(state).forEach(function (riderId) { if (state[riderId]) out.add(riderId); });
+  return out;
+}
+
+// Core assignment logic: geocode the order address, then pick the nearest
+// active + on-duty (for `dateISO`) rider with known base coordinates.
+// Returns { ok:true, riderId, riderName, chatId, distanceKm, lat, lng }
+// or { ok:false, reason: "no_geocode" | "no_riders_on_duty" }.
+function pickRiderForOrder(address, dateISO) {
+  const loc = geocodeAddress(address);
+  if (!loc) return { ok: false, reason: "no_geocode" };
+
+  const onDuty = onDutyRiderIdsForDate(dateISO);
+  const candidates = readRiderRoster().filter(function (r) {
+    return r.active && onDuty.has(r.riderId) && r.baseLat != null && r.baseLng != null;
+  });
+  if (!candidates.length) return { ok: false, reason: "no_riders_on_duty" };
+
+  let best = null, bestKm = Infinity;
+  candidates.forEach(function (r) {
+    const km = haversineKm(loc.lat, loc.lng, r.baseLat, r.baseLng);
+    if (km < bestKm) { bestKm = km; best = r; }
+  });
+  return { ok: true, riderId: best.riderId, riderName: best.name, chatId: best.chatId, distanceKm: bestKm, lat: loc.lat, lng: loc.lng };
+}
+
+// Telegram message sent to the assigned rider.
+function riderAssignmentMessage(data, assign, loadsText) {
+  return "🛵 New Order Assigned!\n" +
+    "👤 Customer: " + data.name + "\n" +
+    "📍 Address: " + data.address + "\n" +
+    "📦 Order: " + loadsText + "\n" +
+    "🕐 Pickup: " + (data.pickup || "-") + "\n" +
+    "🕐 Delivery: " + (data.delivery || "-") + "\n" +
+    "💰 Total: ₱" + data.total + "\n" +
+    "📌 Map: https://maps.google.com/?q=" + assign.lat + "," + assign.lng;
+}
+
+// POST { action:"riderRoster", key, op:"save"|"toggle"|"delete", riderId,
+//        name, chatId, baseAddress, active }
+// "save" upserts (riderId omitted ⇒ new rider, auto-assigned an id); the
+// base address is (re-)geocoded whenever it's provided on save.
+function handleRiderRoster(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  const sheet = getRiderRosterSheet();
+
+  let rowNum = -1;
+  if (data.riderId && sheet.getLastRow() > 1) {
+    const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === data.riderId) { rowNum = i + 2; break; }
+    }
+  }
+
+  if (data.op === "delete") {
+    if (rowNum > 0) sheet.deleteRow(rowNum);
+  } else if (data.op === "toggle") {
+    if (rowNum > 0) {
+      const cur = promoTruthy(sheet.getRange(rowNum, 7).getValue());
+      sheet.getRange(rowNum, 7).setValue(!cur);
+    }
+  } else { // save (upsert)
+    const riderId = data.riderId || nextRiderId();
+    // keep existing coords if the address wasn't changed; re-geocode if it was
+    let lat = "", lng = "";
+    if (rowNum > 0) {
+      const existing = sheet.getRange(rowNum, 1, 1, RIDER_ROSTER_HEADERS.length).getValues()[0];
+      lat = existing[4]; lng = existing[5];
+    }
+    const addressChanged = rowNum < 0 || String(data.baseAddress || "") !== (rowNum > 0 ? String(sheet.getRange(rowNum, 4).getValue()) : "");
+    if (data.baseAddress && addressChanged) {
+      const loc = geocodeAddress(data.baseAddress);
+      if (loc) { lat = loc.lat; lng = loc.lng; }
+      else { lat = ""; lng = ""; } // couldn't geocode — leave blank rather than stale
+    }
+    const row = [
+      riderId,
+      data.name || "",
+      data.chatId || "",
+      data.baseAddress || "",
+      lat,
+      lng,
+      data.active === false ? false : true,
+    ];
+    if (rowNum > 0) sheet.getRange(rowNum, 1, 1, RIDER_ROSTER_HEADERS.length).setValues([row]);
+    else sheet.appendRow(row);
+  }
+  return jsonOut({ ok: true, roster: readRiderRoster() });
+}
+
+// Editor utility: bulk-geocode any roster rows missing coordinates (handy
+// if base addresses were typed directly into the sheet instead of via
+// admin.html). Run manually from the Apps Script editor.
+function geocodeAllRiderBases() {
+  const sheet = getRiderRosterSheet();
+  if (sheet.getLastRow() < 2) return;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, RIDER_ROSTER_HEADERS.length).getValues();
+  rows.forEach(function (r, i) {
+    const address = String(r[3] || "");
+    const hasCoords = r[4] !== "" && r[5] !== "";
+    if (!address || hasCoords) return;
+    const loc = geocodeAddress(address);
+    if (loc) sheet.getRange(i + 2, 5, 1, 2).setValues([[loc.lat, loc.lng]]);
+  });
+}
+
+// POST { action:"riderSchedule", key, date, entries: [{riderId, onDuty}] }
+// Replaces the day's attendance rows with the given entries.
+function handleRiderSchedule(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.date || !Array.isArray(data.entries)) return jsonOut({ ok: false, error: "missing date/entries" });
+
+  const sheet = getRiderScheduleSheet();
+  // drop any existing rows for this date, then write fresh ones — simplest
+  // way to guarantee one row per rider per day with no stale duplicates
+  if (sheet.getLastRow() > 1) {
+    const all = sheet.getRange(2, 1, sheet.getLastRow() - 1, RIDER_SCHEDULE_HEADERS.length).getValues();
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (String(all[i][0]) === data.date) sheet.deleteRow(i + 2);
+    }
+  }
+  const roster = readRiderRoster();
+  const now = new Date();
+  const newRows = data.entries.map(function (en) {
+    const r = roster.filter(function (x) { return x.riderId === en.riderId; })[0];
+    return ["'" + data.date, en.riderId, r ? r.name : "", en.onDuty === true, now];
+  });
+  if (newRows.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, RIDER_SCHEDULE_HEADERS.length).setValues(newRows);
+  }
+  const onDuty = onDutyRiderIdsForDate(data.date);
+  return jsonOut({ ok: true, date: data.date, onDutyCount: onDuty.size });
+}
+
+// POST { action:"reassignRider", key, receiptNo, riderId }
+// Manually reassign an order to a different rider; re-geocodes the order's
+// stored address (coordinates aren't persisted per-order) and re-sends the
+// assignment Telegram message to the newly chosen rider.
+function handleReassignRider(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.receiptNo || !data.riderId) return jsonOut({ ok: false, error: "missing receiptNo/riderId" });
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return jsonOut({ ok: false, error: "no orders" });
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+  let rowNum = -1, orderRow = null;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][HEADERS.indexOf("Receipt No")]) === data.receiptNo) { rowNum = i + 2; orderRow = rows[i]; break; }
+  }
+  if (rowNum < 0) return jsonOut({ ok: false, error: "order not found" });
+
+  const rider = readRiderRoster().filter(function (r) { return r.riderId === data.riderId; })[0];
+  if (!rider) return jsonOut({ ok: false, error: "rider not found" });
+
+  const address = String(orderRow[HEADERS.indexOf("Address")]);
+  const loc = geocodeAddress(address);
+  const distanceKm = (loc && rider.baseLat != null && rider.baseLng != null)
+    ? haversineKm(loc.lat, loc.lng, rider.baseLat, rider.baseLng) : null;
+
+  const iAssignedRider = HEADERS.indexOf("Assigned Rider");
+  sheet.getRange(rowNum, iAssignedRider + 1, 1, 4).setValues([[
+    rider.name,
+    rider.riderId,
+    distanceKm != null ? distanceKm.toFixed(2) : "",
+    new Date(),
+  ]]);
+
+  // re-notify the newly assigned rider — best-effort
+  try {
+    if (rider.chatId && loc) {
+      const fakeOrder = {
+        name: String(orderRow[HEADERS.indexOf("Name")]),
+        address: address,
+        pickup: String(orderRow[HEADERS.indexOf("Pickup")]),
+        delivery: String(orderRow[HEADERS.indexOf("Delivery")]),
+        total: String(orderRow[HEADERS.indexOf("Total (PHP)")]),
+      };
+      const loadsText = String(orderRow[HEADERS.indexOf("Loads")]);
+      sendTelegramTo(rider.chatId, riderAssignmentMessage(fakeOrder, { lat: loc.lat, lng: loc.lng }, loadsText));
+    }
+  } catch (err) {
+    console.error("reassign notify failed: " + err);
+  }
+
+  return jsonOut({ ok: true, riderName: rider.name, riderId: rider.riderId, distanceKm: distanceKm });
 }
 
 // ===== Promo codes =====
@@ -480,11 +847,20 @@ function jsonOut(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Sends to the shop-owner chat (TELEGRAM_CHAT_ID) — unchanged behaviour.
 function sendTelegram(text) {
-  if (TELEGRAM_BOT_TOKEN.indexOf("PASTE_") === 0 || TELEGRAM_CHAT_ID.indexOf("PASTE_") === 0) return;
+  sendTelegramTo(TELEGRAM_CHAT_ID, text);
+}
+
+// Sends to an arbitrary chat id (e.g. a rider's Telegram chat), using the
+// same bot. No-op if the bot token or the target chat id is unset/blank/
+// still the placeholder value.
+function sendTelegramTo(chatId, text) {
+  if (TELEGRAM_BOT_TOKEN.indexOf("PASTE_") === 0) return;
+  if (!chatId || String(chatId).indexOf("PASTE_") === 0) return;
   UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage", {
     method: "post",
-    payload: { chat_id: TELEGRAM_CHAT_ID, text: text },
+    payload: { chat_id: chatId, text: text },
     muteHttpExceptions: true,
   });
 }
@@ -498,7 +874,7 @@ function setupSheet() {
   if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS);
   sheet.setFrozenRows(1);
   getBlockedSheet(); // create the BlockedSlots sheet too
-  getRidersSheet();  // create the Riders sheet too
+  getRidersSheet();  // create the Riders sheet too (slot-capacity headcount)
 
   // PromoCodes sheet — seed the FIRSTORDER code + a disabled example
   const promo = getPromoSheet();
@@ -508,6 +884,17 @@ function setupSheet() {
     promo.appendRow(["'WELCOME50", "fixed", 50, "", false, "Example: ₱50 off (inactive)", 0, 0, false]);
   }
   promo.setFrozenRows(1);
+
+  // RiderRoster sheet — seed 2 placeholder riders (edit these in admin.html
+  // or directly in the sheet; base address needs geocoding — either save it
+  // once from admin.html, or type it in and run geocodeAllRiderBases()).
+  const roster = getRiderRosterSheet();
+  if (roster.getLastRow() === 1) {
+    roster.appendRow(["rider_1", "Rider 1 (edit me)", "PASTE_RIDER1_CHAT_ID", "", "", "", true]);
+    roster.appendRow(["rider_2", "Rider 2 (edit me)", "PASTE_RIDER2_CHAT_ID", "", "", "", true]);
+  }
+  roster.setFrozenRows(1);
+  getRiderScheduleSheet(); // create the RiderSchedule sheet too
 
   const statusRange = sheet.getRange("C2:C1000");
   statusRange.setDataValidation(
