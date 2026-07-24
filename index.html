@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Laundry+ | Wash + Dry + Fold — Book for Pickup</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧺</text></svg>">
+<link rel="icon" href="assets/logo-black.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -934,12 +934,12 @@ const SPEEDS = [
 ];
 const ADDONS = [
   // per: "load" multiplies by the number of loads; "order" is a one-time fee
-  { id: "bleach",          label: "Bleach",             fee: 20,  per: "load"  },
-  { id: "detergent",       label: "Extra Detergent",    fee: 10,  per: "load"  },
-  { id: "bag",             label: "Laundry+ Bag",       fee: 200, per: "order" },
-  { id: "colorsafebleach", label: "Color Safe Bleach",  fee: 20,  per: "load"  },
-  { id: "extrarinse",      label: "Extra Rinse",        fee: 50,  per: "load"  },
-  { id: "fabcon",          label: "Fabcon",             fee: 10,  per: "load"  },
+  { id: "bleach",          label: "Bleach (White)",       fee: 20,  per: "load"  },
+  { id: "colorsafebleach", label: "Bleach (Color Safe)",  fee: 20,  per: "load"  },
+  { id: "detergent",       label: "Extra Detergent",      fee: 10,  per: "load"  },
+  { id: "fabcon",          label: "Extra Fabcon",         fee: 10,  per: "load"  },
+  { id: "extrarinse",      label: "Extra Rinse",          fee: 50,  per: "load"  },
+  { id: "bag",             label: "Laundry+ Bag",         fee: 200, per: "order" },
 ];
 // How the customer wants their laundry separated (extra charges confirmed in-store)
 // `label` is also the value recorded in the sheet — keep it clean; display

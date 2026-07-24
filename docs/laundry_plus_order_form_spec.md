@@ -117,9 +117,12 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
   - セクション下部の注記: "Any additional fees will be confirmed by our staff upon receiving your laundry."
   - Per Bag 選択時は **No. of Bags が必須**になり、「Per Bag × N bags」として記録。
     シートに記録される値は素のラベル(例: "Whites & Colored")で、⭐等の装飾は含まない。
-- **Add-ons**: Bleach +₱20/load、Extra Detergent +₱10/load、Laundry+ Bag +₱200(注文につき1回)、
-  Color Safe Bleach +₱20/load、Extra Rinse +₱50/load、Fabcon +₱10/load
-  (load課金のものはいずれもload数×料金。load数は§3の定義)
+- **Add-ons**(表示順、固定): Bleach (White) +₱20/load / Bleach (Color Safe) +₱20/load /
+  Extra Detergent +₱10/load / Extra Fabcon +₱10/load / Extra Rinse +₱50/load /
+  Laundry+ Bag +₱200(注文につき1回)。
+  (load課金のものはいずれもload数×料金。load数は§3の定義。GAS・管理画面には
+  ハードコードされたAdd-onsリストが無く、フォームが送信した内容をそのまま記録・表示するため、
+  この順序変更・改名はフォーム側の `ADDONS` 配列のみで完結する)
 
 ### §4.1 Terms & Conditions 同意(必須)
 
