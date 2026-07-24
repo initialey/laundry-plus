@@ -280,7 +280,7 @@ const WEEKDAY_SLOTS = [
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
   { v: "19:00", label: "7:00–8:30 PM" },
-  { v: "20:30", label: "8:30–9:00 PM" },
+  { v: "20:30", label: "8:30–9:00 PM", special: true }, // near rider off-time, kept limited
 ];
 const WEEKEND_SLOTS = [
   { v: "09:00", label: "9:00–10:30 AM" },
@@ -288,7 +288,7 @@ const WEEKEND_SLOTS = [
   { v: "13:00", label: "1:00–2:30 PM" },
   { v: "15:00", label: "3:00–4:30 PM" },
   { v: "17:00", label: "5:00–6:30 PM" },
-  { v: "18:30", label: "6:30–7:00 PM" },
+  { v: "18:30", label: "6:30–7:00 PM", special: true }, // near rider off-time, kept limited
 ];
 const slotsForDate = d => (d.getDay() === 0 || d.getDay() === 6) ? WEEKEND_SLOTS : WEEKDAY_SLOTS;
 
@@ -391,7 +391,7 @@ async function load() {
     const cls = blocked ? "blocked" : (active >= cap ? "full" : "");
     html += `<div class="slot ${cls}">
       <div class="top">
-        <span class="time">${s.label}</span>
+        <span class="time">${s.label}${s.special ? " ⚠️" : ""}</span>
         <span class="cnt">${blocked ? "BLOCKED" : `${active}/${cap}${active >= cap ? " FULL" : ""}`}</span>
         <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
       </div>
