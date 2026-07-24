@@ -735,7 +735,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="pr"><span class="num">240</span><span class="per">PHP</span></div>
     </div>
     <div class="prow">
-      <div class="pl">↳ Additional Weight <small>(+₱45/kg, applies up to 12kg only)</small></div>
+      <div class="pl">↳ Additional Weight <small>(applies up to 12kg only)</small></div>
       <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
     </div>
     <div class="prow">
@@ -906,9 +906,9 @@ const LOAD_TYPES = [
   { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 up to 7kg +₱45/kg (max 12kg)" },
   { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 max 5kg/load" },
   { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
-  { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg/load)" },
-  { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg/load)" },
-  { group: "Single Services",    id: "foldonly",    label: "Fold Only",                         model: "load", base: 80,  includedKg: 7, extraPerKg: 15, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱80 up to 7kg +₱15/kg (max 12kg/load)" },
+  { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg)" },
+  { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg (max 12kg)" },
+  { group: "Single Services",    id: "foldonly",    label: "Fold Only",                         model: "load", base: 80,  includedKg: 7, extraPerKg: 15, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱80 up to 7kg +₱15/kg (max 12kg)" },
   { group: "Press Only",         id: "presskg",     label: "Press Only (per kg)",               model: "rate", rate: 155, unit: "kg", step: 0.5, max: 20, def: 1, tag: "₱155/kg, no min" },
   { group: "Press Only",         id: "tops",        label: "Tops (Shirt, Polo, Long Sleeves)",  model: "rate", rate: 40,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱40/pc" },
   { group: "Press Only",         id: "bottoms",     label: "Bottoms (Pants, Trousers, Shorts)", model: "rate", rate: 55,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱55/pc" },
