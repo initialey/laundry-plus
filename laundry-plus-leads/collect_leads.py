@@ -88,7 +88,7 @@ def is_portal(name, website):
     return any(keyword in haystack for keyword in config.PORTAL_EXCLUDE_KEYWORDS)
 
 
-def compute_score(rating, review_count, phone, website, category):
+def compute_score(rating, review_count, phone, website):
     score = 0
     if rating >= config.SCORE_RATING_HIGH_THRESHOLD:
         score += config.SCORE_RATING_HIGH_POINTS
@@ -98,8 +98,6 @@ def compute_score(rating, review_count, phone, website, category):
         score += config.SCORE_PHONE_POINTS
     if website:
         score += config.SCORE_WEBSITE_POINTS
-    if category in config.SCORE_LODGING_CATEGORIES:
-        score += config.SCORE_LODGING_POINTS
     return max(1, min(10, score))
 
 
@@ -117,6 +115,8 @@ def parse_place(raw, category):
         return None
     if rating < config.MIN_RATING:
         return None
+    if not (config.MIN_REVIEW_COUNT <= review_count <= config.MAX_REVIEW_COUNT):
+        return None
     if is_portal(name, website):
         return None
 
@@ -130,7 +130,7 @@ def parse_place(raw, category):
         "website": website,
         "google_maps_url": maps_url,
         "place_id": place_id,
-        "lead_score": compute_score(rating, review_count, phone, website, category),
+        "lead_score": compute_score(rating, review_count, phone, website),
     }
 
 

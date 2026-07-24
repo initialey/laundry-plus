@@ -18,16 +18,14 @@ SEARCH_CENTER = {
 SEARCH_RADIUS_METERS = 3000
 
 # Places API (New) included types. Each category is queried separately.
+# Hotel/lodging/motel are excluded on purpose: those results are
+# dominated by large international chains, not the small/mid-size
+# businesses this tool targets.
 CATEGORIES = [
-    "hotel",
-    "lodging",
-    "motel",
     "restaurant",
     "cafe",
-    "food",
     "beauty_salon",
     "spa",
-    "clinic",
 ]
 
 LANGUAGE_CODE = "en"
@@ -37,11 +35,18 @@ MAX_RESULTS_PER_CATEGORY = 20
 
 # --- Filters -----------------------------------------------------------
 
-MIN_RATING = 3.5
+MIN_RATING = 3.8
 
-# Names/websites containing these (case-insensitive) are excluded as
-# third-party booking/review portals rather than the business itself.
+# Review count band: below MIN, review volume is too low to gauge real
+# throughput; above MAX, the venue is very likely a large chain outlet.
+MIN_REVIEW_COUNT = 500
+MAX_REVIEW_COUNT = 4000
+
+# Names/websites containing these (case-insensitive) are excluded:
+# third-party booking/review portals, plus major hotel/F&B chains that
+# are out of scope for small/mid-size business outreach.
 PORTAL_EXCLUDE_KEYWORDS = [
+    # third-party portals
     "agoda",
     "booking.com",
     "booking",
@@ -56,6 +61,36 @@ PORTAL_EXCLUDE_KEYWORDS = [
     "opentable",
     "klook",
     "traveloka",
+    # major hotel chains
+    "shangri-la",
+    "hyatt",
+    "marriott",
+    "holiday inn",
+    "dusit",
+    "fairmont",
+    "ascott",
+    "discovery",
+    "peninsula",
+    "sheraton",
+    "hilton",
+    "novotel",
+    "conrad",
+    "mandarin oriental",
+    "red planet",
+    "seda",
+    # major F&B chains
+    "mcdonald's",
+    "mcdonalds",
+    "vikings",
+    "starbucks",
+    "jollibee",
+    "kfc",
+    "chowking",
+    "mang inasal",
+    "greenwich",
+    "pizza hut",
+    "wendy's",
+    "wendys",
 ]
 
 # --- Lead scoring (1-10) ------------------------------------------------
@@ -69,9 +104,6 @@ SCORE_REVIEW_COUNT_POINTS = 2
 SCORE_PHONE_POINTS = 2
 
 SCORE_WEBSITE_POINTS = 1
-
-SCORE_LODGING_CATEGORIES = {"hotel", "lodging"}
-SCORE_LODGING_POINTS = 2
 
 HIGH_PRIORITY_SCORE_THRESHOLD = 7
 

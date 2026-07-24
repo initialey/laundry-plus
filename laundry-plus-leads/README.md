@@ -46,11 +46,19 @@ Edit `config.py` to change:
 - `SEARCH_CENTER` / `SEARCH_RADIUS_METERS` — search area (defaults to a
   3000m radius around BGC, 14.5547, 121.0509)
 - `CATEGORIES` — Places API included types searched (one Nearby Search
-  request per category): `hotel`, `lodging`, `motel`, `restaurant`,
-  `cafe`, `food`, `beauty_salon`, `spa`, `clinic`
-- `MIN_RATING` — minimum rating filter (default 3.5)
+  request per category): `restaurant`, `cafe`, `beauty_salon`, `spa`.
+  Hotel/lodging/motel are intentionally excluded — this tool targets
+  small/mid-size businesses, and hotel results are dominated by large
+  chains.
+- `MIN_RATING` — minimum rating filter (default 3.8)
+- `MIN_REVIEW_COUNT` / `MAX_REVIEW_COUNT` — review count band (default
+  500–4000). Below the minimum, review volume is too low to gauge real
+  throughput; above the maximum, the venue is very likely a large chain
+  outlet.
 - `PORTAL_EXCLUDE_KEYWORDS` — name/website substrings that mark a result
-  as a third-party portal to exclude
+  as a third-party portal or major chain to exclude (booking sites like
+  Agoda/TripAdvisor, plus chains like McDonald's, Starbucks, Jollibee,
+  Shangri-La, Marriott, etc.)
 - scoring weights/thresholds (see "Lead scoring" below)
 
 Note: Nearby Search (New) returns at most 20 results per category per
@@ -79,7 +87,6 @@ Points are summed and clamped to the 1-10 range:
 - Review count >= 50: +2
 - Has a phone number: +2
 - Has a website: +1
-- Category is `hotel` or `lodging`: +2
 
 Leads with a score of 7 or higher are counted as "high priority" in the
 run summary.
