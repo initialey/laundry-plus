@@ -28,7 +28,8 @@
   - Standard=集荷2日後以降 / 24 Hours=翌日以降、いずれも全スロット自由選択
   - **Rush / Super Rush** はデリバリー日を固定しない(集荷日以降を自由選択)。**同日**デリバリーを選んだ時だけ集荷時刻に応じた固定対応表(仕様書§6.1)で絞り込み、該当枠が無ければ「Lalamove(customer arranges/pays)」に自動切替。後日デリバリーはその日の全スロット自由選択
   - スロット上限 = その日のライダー人数 × 4(各ライダー1枠4件、1人=4件 / 2人=8件、デフォルト2人=8件/枠)。admin.html の Rider Management で日付ごとに1/2を設定でき、人数を減らすとその日のスロット上限が下がる。満枠・ブロック済みスロットは FULL 表示で選択不可
-- **連絡先**: Facebook アカウント欄と希望連絡手段(SMS / Messenger)
+- **連絡先**: Facebook Profile URL(必須・`https://www.facebook.com/yourname` 形式)と希望連絡手段(SMS / Messenger)
+- **住所**: 番地・通り・バランガイ欄に加えて **City 欄が必須**(自動アサインのジオコーディング精度向上のため、住所とセットでAPIに渡されます)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
 
 ## 管理画面(admin.html)
@@ -39,12 +40,15 @@
 - スロット単位で **BLOCK / UNBLOCK** — ブロックしたスロットは予約フォームで FULL 表示になり選択不可
 - アクセスには管理キーが必要: `gas/Code.gs` の `ADMIN_KEY` を自分だけの値に変更し、admin.html の Key 欄に同じ値を入力(端末に保存されます)
 - ブロック情報はスプレッドシートの `BlockedSlots` シートに保存(直接編集も可)
+- **Slot Capacity Override**(Rider Management パネル内): 日付ごとに1スロットあたりの上限数を手動で直接指定できる(ライダー人数×4の自動計算を上書き)。未設定の日はこれまで通り自動計算のデフォルトを使用。Set で設定・Clear で解除、値は `Riders` シートの4列目(Capacity Override)に保存
+- **注文一覧のステータス管理**: 各予約行にステータスのドロップダウン(NEW / WASHING / READY / PICKED UP / CANCELLED)。変更すると即座にSheetsへ反映され、「Your Name」欄に登録した担当者名と変更日時が記録・表示される(未入力の場合は先にYour Nameの入力を促される)
+- **Facebookリンク**: 各予約行にFBリンクが表示され、タップでお客さんのFacebookページに遷移
 - **Riders パネル**(ライダー名簿・出勤管理・自動アサイン)
   - ①ライダー登録: 名前・拠点住所・Telegram Chat ID を入力して登録。既存ライダーは Edit で編集、ON/OFF で有効/無効切替、✕ で削除
   - ②本日の出勤管理: 有効なライダーがカード表示され、On Duty / Off をトグルして Save Attendance で保存(`RiderSchedule` シートに記録)
   - ③別日の出勤確認: 日付を選んで「N/M riders on duty」を確認(閲覧のみ)
   - 各予約行にライダー再アサイン用のドロップダウンがあり、選択すると即座に担当ライダーを切り替えて Telegram 再通知
-  - 新規注文は Google Geocoding API で住所を座標変換し、その日出勤中(Active かつ On Duty)のライダーのうち拠点から最も近い1人に自動アサインし、Telegram で通知(出勤ライダーが0人の場合は「未アサイン」で記録し、オーナーに警告通知)
+  - 新規注文は Google Geocoding API で住所+City を座標変換し、その日出勤中(Active かつ On Duty)のライダーのうち拠点から最も近い1人に自動アサインし、Telegram で通知(出勤ライダーが0人の場合は「未アサイン」で記録し、オーナーに警告通知)
 
 ## 使い方(ローカルで開く)
 
@@ -92,9 +96,10 @@ payload の形:
   "receivedAt": "2026-07-11T06:04:29.000Z",
   "name": "Juan dela Cruz",
   "phone": "0917 123 4567",
-  "fb": "facebook.com/juandelacruz",
+  "fb": "https://www.facebook.com/juandelacruz",
   "contactVia": "Facebook Messenger",
-  "address": "123 Sample St., Brgy. Uno, Quezon City",
+  "address": "123 Sample St., Brgy. Uno",
+  "city": "Quezon City",
   "pickup": "2026-07-12 08:00",
   "delivery": "2026-07-14 18:00",
   "loads": [{ "type": "assorted", "label": "Assorted Clothes", "qty": 7, "unit": "kg", "amount": 240 }],

@@ -8,11 +8,14 @@
 //
 // NOTE: the column layout changed (FB / Contact Via / Pickup / Delivery /
 // Separation / Add-ons / T&C Agreed / Promo Code / Discount / Assigned Rider /
-// Rider ID / Distance (km) / Assigned At were added). If you already have an
+// Rider ID / Distance (km) / Assigned At / City / Status Updated By /
+// Status Updated At were added; the "FB" column is now labelled
+// "Facebook URL", same position, just a text rename). If you already have an
 // "Orders" sheet from an older version, rename it (e.g. "Orders-old") and
 // run setupSheet() again so new orders land under the right headers.
 // setupSheet() also creates the PromoCodes / Riders / RiderRoster /
-// RiderSchedule sheets.
+// RiderSchedule sheets, and backfills the Riders sheet's 4th column header
+// ("Capacity Override") if it's missing.
 //
 // Auto-assign setup: in the Apps Script editor, Project Settings → Script
 // Properties → add GEOCODING_API_KEY (a Google Cloud API key with the
@@ -34,10 +37,11 @@ const ADMIN_KEY = "CHANGE_ME_ADMIN_KEY";
 // ===== Sheet settings =====
 const SHEET_NAME = "Orders";
 const HEADERS = [
-  "Receipt No", "Received At", "Status", "Name", "Phone", "FB", "Contact Via",
+  "Receipt No", "Received At", "Status", "Name", "Phone", "Facebook URL", "Contact Via",
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
   "T&C Agreed", "Speed", "Notes", "Promo Code", "Discount", "Total (PHP)",
   "Assigned Rider", "Rider ID", "Distance (km)", "Assigned At",
+  "City", "Status Updated By", "Status Updated At",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -86,6 +90,7 @@ function doPost(e) {
   if (data.action === "riderRoster") return handleRiderRoster(data); // from admin.html (roster CRUD)
   if (data.action === "riderSchedule") return handleRiderSchedule(data); // from admin.html (daily attendance)
   if (data.action === "reassignRider") return handleReassignRider(data); // from admin.html (manual reassignment)
+  if (data.action === "updateStatus") return handleUpdateStatus(data); // from admin.html (order status dropdown)
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -120,11 +125,15 @@ function doPost(e) {
   // Auto-assign the nearest on-duty rider — best-effort, computed BEFORE the
   // row is appended so the result lands in the same write (no second pass).
   // Any failure here (bad API key, geocoding down, etc.) must never stop the
-  // order from being recorded.
+  // order from being recorded. Geocode Address + City together — City alone
+  // isn't stored back into the Address column, but leaving it out of the
+  // geocoding query would badly hurt accuracy (many streets/barangays share
+  // names across different Metro Manila cities).
+  const fullAddress = [data.address, data.city].filter(Boolean).join(", ");
   let assign = { ok: false, reason: "error" };
   try {
     const pickupISO = (data.pickup || "").slice(0, 10); // "YYYY-MM-DD HH:MM" -> date part
-    assign = pickRiderForOrder(data.address, pickupISO || todayISODate());
+    assign = pickRiderForOrder(fullAddress, pickupISO || todayISODate());
   } catch (err) {
     console.error("pickRiderForOrder failed: " + err);
   }
@@ -156,6 +165,9 @@ function doPost(e) {
     assign.ok ? assign.riderId : "",
     assign.ok ? assign.distanceKm.toFixed(2) : "",
     assign.ok ? new Date() : "",
+    data.city || "",
+    "", // Status Updated By — blank until an admin changes the status
+    "", // Status Updated At
   ]);
 
   // count the use only after the order is safely recorded
@@ -170,7 +182,7 @@ function doPost(e) {
       "👤 " + data.name + " / " + data.phone +
       (data.fb ? " / FB: " + data.fb : "") + "\n" +
       "📱 Contact via: " + (data.contactVia || "-") + "\n" +
-      "📍 " + data.address + "\n" +
+      "📍 " + data.address + (data.city ? ", " + data.city : "") + "\n" +
       "🚚 Pickup: " + (data.pickup || "-") + "\n" +
       "🏠 Delivery: " + (data.delivery || "-") + "\n\n" +
       loadsText + "\n\n" +
@@ -190,7 +202,11 @@ function doPost(e) {
   // the owner notification above.
   try {
     if (assign.ok) {
-      sendTelegramTo(assign.chatId, riderAssignmentMessage(data, assign, loadsText));
+      // Fill the rider message's "Address" placeholder with Address+City
+      // (riders need the city to actually find the place) — the message's
+      // fixed wording/emoji structure in riderAssignmentMessage() itself is
+      // untouched, only the address value passed into it is enriched.
+      sendTelegramTo(assign.chatId, riderAssignmentMessage(Object.assign({}, data, { address: fullAddress }), assign, loadsText));
     } else if (assign.reason === "no_riders_on_duty") {
       sendTelegramTo(TELEGRAM_CHAT_ID, "⚠️ No riders on duty today!");
     }
@@ -234,19 +250,28 @@ function doGet(e) {
         receipt: String(row[idx.receipt]),
         name: String(row[idx.name]),
         phone: String(row[idx.phone]),
+        fb: String(row[idx.fb] || ""),
         speed: String(row[idx.speed]),
         status: String(row[idx.status]),
         assignedRider: String(row[idx.assignedRider] || ""),
         riderId: String(row[idx.riderId] || ""),
+        statusUpdatedBy: String(row[idx.statusUpdatedBy] || ""),
+        statusUpdatedAt: (row[idx.statusUpdatedAt] instanceof Date) ? row[idx.statusUpdatedAt].toISOString() : "",
       });
     });
-    return jsonOut({ ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date), blocked: getBlocked(p.date), bookings: bookings });
+    return jsonOut({
+      ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date),
+      capOverride: capacityOverrideForDate(p.date), blocked: getBlocked(p.date), bookings: bookings,
+    });
   }
 
   // Admin: read the rider count for a date.
   if (p.action === "riders" && p.date) {
     if (p.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
-    return jsonOut({ ok: true, date: p.date, riders: ridersForDate(p.date), cap: capacityForDate(p.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
+    return jsonOut({
+      ok: true, date: p.date, riders: ridersForDate(p.date), cap: capacityForDate(p.date),
+      perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS, capOverride: capacityOverrideForDate(p.date),
+    });
   }
 
   // Admin: list the rider roster (name, base address, active, etc.) for admin.html.
@@ -290,11 +315,14 @@ function forEachBookingOn(date, cb) {
     status: HEADERS.indexOf("Status"),
     name: HEADERS.indexOf("Name"),
     phone: HEADERS.indexOf("Phone"),
+    fb: HEADERS.indexOf("Facebook URL"),
     pickup: HEADERS.indexOf("Pickup"),
     delivery: HEADERS.indexOf("Delivery"),
     speed: HEADERS.indexOf("Speed"),
     assignedRider: HEADERS.indexOf("Assigned Rider"),
     riderId: HEADERS.indexOf("Rider ID"),
+    statusUpdatedBy: HEADERS.indexOf("Status Updated By"),
+    statusUpdatedAt: HEADERS.indexOf("Status Updated At"),
   };
   const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
   rows.forEach(function (r) {
@@ -321,7 +349,7 @@ function getRidersSheet() {
   let sheet = ss.getSheetByName(RIDERS_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(RIDERS_SHEET);
-    sheet.appendRow(["Date", "Count", "Updated At"]);
+    sheet.appendRow(["Date", "Count", "Updated At", "Capacity Override"]);
   }
   return sheet;
 }
@@ -341,34 +369,76 @@ function ridersForDate(date) {
   return DEFAULT_RIDERS;
 }
 
-// Per-slot capacity for a date = riders × SLOTS_PER_RIDER.
-function capacityForDate(date) {
-  return ridersForDate(date) * SLOTS_PER_RIDER;
+// Manual per-slot capacity override for a date (column 4 of the Riders
+// sheet), set from admin.html's "Slot Capacity Override" control. Returns
+// null if unset — capacityForDate() then falls back to riders × SLOTS_PER_RIDER.
+function capacityOverrideForDate(date) {
+  const sheet = getRidersSheet();
+  if (sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === date) {
+        const n = Number(rows[i][3]);
+        return n > 0 ? n : null;
+      }
+    }
+  }
+  return null;
 }
 
-// POST { action:"riders", key, date, count } — set the rider count for a day.
+// Per-slot capacity for a date = manual override if set, else riders × SLOTS_PER_RIDER.
+function capacityForDate(date) {
+  const override = capacityOverrideForDate(date);
+  return override != null ? override : ridersForDate(date) * SLOTS_PER_RIDER;
+}
+
+// POST { action:"riders", key, date, count?, capOverride? } — set the rider
+// count and/or the manual slot-capacity override for a day. Either field can
+// be omitted to leave it unchanged (e.g. the "Slot Capacity Override" UI only
+// sends capOverride, the "1/2 Riders" buttons only send count). capOverride
+// of 0/""/null clears the override and restores the riders×4 default.
 function handleRiders(data) {
   if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
   if (!data.date) return jsonOut({ ok: false, error: "missing date" });
-  const count = Math.max(0, Math.min(8, Math.round(Number(data.count))));
   const sheet = getRidersSheet();
-  let rowNum = -1;
+
+  let rowNum = -1, curCount = DEFAULT_RIDERS, curOverride = "";
   if (sheet.getLastRow() > 1) {
-    const dates = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
-    for (let i = 0; i < dates.length; i++) {
-      if (String(dates[i][0]) === data.date) { rowNum = i + 2; break; }
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === data.date) {
+        rowNum = i + 2;
+        curCount = Number(rows[i][1]) || DEFAULT_RIDERS;
+        curOverride = rows[i][3];
+        break;
+      }
     }
   }
-  // storing DEFAULT is fine, but keep the sheet tidy: a default value removes the override
+
+  const count = data.count !== undefined
+    ? Math.max(0, Math.min(8, Math.round(Number(data.count))))
+    : curCount;
+  let override = curOverride;
+  if (data.capOverride !== undefined) {
+    const n = Number(data.capOverride);
+    override = (n > 0) ? Math.round(n) : "";
+  }
+
+  // storing DEFAULT count with no override is fine, but keep the sheet tidy:
+  // that combination removes the row entirely (nothing left to override)
   const now = new Date();
-  if (count === DEFAULT_RIDERS) {
+  if (count === DEFAULT_RIDERS && override === "") {
     if (rowNum > 0) sheet.deleteRow(rowNum);
   } else if (rowNum > 0) {
-    sheet.getRange(rowNum, 2, 1, 2).setValues([[count, now]]);
+    sheet.getRange(rowNum, 2, 1, 3).setValues([[count, now, override]]);
   } else {
-    sheet.appendRow(["'" + data.date, count, now]);
+    sheet.appendRow(["'" + data.date, count, now, override]);
   }
-  return jsonOut({ ok: true, date: data.date, riders: ridersForDate(data.date), cap: capacityForDate(data.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS });
+  return jsonOut({
+    ok: true, date: data.date, riders: ridersForDate(data.date),
+    cap: capacityForDate(data.date), perRider: SLOTS_PER_RIDER, def: DEFAULT_RIDERS,
+    capOverride: capacityOverrideForDate(data.date),
+  });
 }
 
 function getBlocked(date) {
@@ -658,7 +728,9 @@ function handleReassignRider(data) {
   if (!rider) return jsonOut({ ok: false, error: "rider not found" });
 
   const address = String(orderRow[HEADERS.indexOf("Address")]);
-  const loc = geocodeAddress(address);
+  const city = String(orderRow[HEADERS.indexOf("City")] || "");
+  const fullAddress = [address, city].filter(Boolean).join(", ");
+  const loc = geocodeAddress(fullAddress);
   const distanceKm = (loc && rider.baseLat != null && rider.baseLng != null)
     ? haversineKm(loc.lat, loc.lng, rider.baseLat, rider.baseLng) : null;
 
@@ -675,7 +747,7 @@ function handleReassignRider(data) {
     if (rider.chatId && loc) {
       const fakeOrder = {
         name: String(orderRow[HEADERS.indexOf("Name")]),
-        address: address,
+        address: fullAddress,
         pickup: String(orderRow[HEADERS.indexOf("Pickup")]),
         delivery: String(orderRow[HEADERS.indexOf("Delivery")]),
         total: String(orderRow[HEADERS.indexOf("Total (PHP)")]),
@@ -688,6 +760,32 @@ function handleReassignRider(data) {
   }
 
   return jsonOut({ ok: true, riderName: rider.name, riderId: rider.riderId, distanceKm: distanceKm });
+}
+
+// POST { action:"updateStatus", key, receiptNo, status, updatedBy }
+// Changes an order's Status from admin.html and records who made the change
+// and when. `status` must be one of STATUSES (unchanged in this feature —
+// the 5-value list stays NEW/WASHING/READY/PICKED UP/CANCELLED for now).
+function handleUpdateStatus(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.receiptNo || !data.status) return jsonOut({ ok: false, error: "missing receiptNo/status" });
+  if (STATUSES.indexOf(data.status) === -1) return jsonOut({ ok: false, error: "invalid status" });
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return jsonOut({ ok: false, error: "no orders" });
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+  let rowNum = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][HEADERS.indexOf("Receipt No")]) === data.receiptNo) { rowNum = i + 2; break; }
+  }
+  if (rowNum < 0) return jsonOut({ ok: false, error: "order not found" });
+
+  const now = new Date();
+  const updatedBy = String(data.updatedBy || "").trim();
+  sheet.getRange(rowNum, HEADERS.indexOf("Status") + 1).setValue(data.status);
+  sheet.getRange(rowNum, HEADERS.indexOf("Status Updated By") + 1, 1, 2).setValues([[updatedBy, now]]);
+
+  return jsonOut({ ok: true, receiptNo: data.receiptNo, status: data.status, updatedBy: updatedBy, updatedAt: now.toISOString() });
 }
 
 // ===== Promo codes =====
@@ -874,7 +972,12 @@ function setupSheet() {
   if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS);
   sheet.setFrozenRows(1);
   getBlockedSheet(); // create the BlockedSlots sheet too
-  getRidersSheet();  // create the Riders sheet too (slot-capacity headcount)
+  const riders = getRidersSheet(); // create the Riders sheet too (slot-capacity headcount)
+  // backfill the 4th header on a pre-existing Riders sheet from before the
+  // Slot Capacity Override feature — safe no-op if it's already there
+  if (String(riders.getRange(1, 4).getValue()) !== "Capacity Override") {
+    riders.getRange(1, 4).setValue("Capacity Override");
+  }
 
   // PromoCodes sheet — seed the FIRSTORDER code + a disabled example
   const promo = getPromoSheet();
