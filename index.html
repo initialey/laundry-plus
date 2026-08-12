@@ -222,6 +222,33 @@ form { margin-top: 30px; display: flex; flex-direction: column; gap: 18px; }
 }
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .field { flex: 1 1 180px; }
+.barangay-field {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height .3s ease, opacity .3s ease;
+}
+.barangay-field.show { max-height: 120px; opacity: 1; }
+.othernotice {
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-deep);
+}
+.othernotice p { margin-bottom: 14px; }
+.fbchatbtn {
+  display: inline-block;
+  background: #1877f2;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 3px 0 #0f5bc4;
+}
+.fbchatbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #0f5bc4; }
 label.lbl {
   display: block;
   font-weight: 800;
@@ -232,7 +259,7 @@ label.lbl {
   margin-bottom: 5px;
 }
 label.lbl .req { color: var(--pink); margin-left: 3px; }
-input[type=text], input[type=tel], input[type=number], input[type=date], select, textarea {
+input[type=text], input[type=tel], input[type=number], input[type=date], input[type=url], select, textarea {
   width: 100%;
   font-family: var(--body);
   font-weight: 700;
@@ -755,11 +782,25 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
           <label class="lbl" for="address">Address<span class="req">*</span></label>
           <input type="text" id="address" name="address" placeholder="House No., Street, Barangay" required autocomplete="street-address" data-err="Please enter your address.">
         </div>
-        <div class="field">
+        <div class="field" style="flex-basis: 100%;">
           <label class="lbl" for="city">City<span class="req">*</span></label>
-          <input type="text" id="city" name="city" placeholder="Quezon City" required autocomplete="address-level2" data-err="Please enter your city.">
+          <select id="city" name="city" required data-err="Please select your city.">
+            <option value="" selected disabled>Select your city</option>
+            <option value="Taguig">Taguig</option>
+            <option value="BGC">BGC (Bonifacio Global City)</option>
+            <option value="Makati">Makati</option>
+            <option value="Mandaluyong">Mandaluyong</option>
+            <option value="Pasig">Pasig</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
-        <div class="field">
+        <div class="field barangay-field" id="barangayField" style="flex-basis: 100%;">
+          <label class="lbl" for="barangay">Barangay<span class="req">*</span></label>
+          <select id="barangay" name="barangay">
+            <option value="" selected disabled>Select your barangay</option>
+          </select>
+        </div>
+        <div class="field" style="flex-basis: 100%;">
           <label class="lbl" for="fb">Facebook Profile URL<span class="req">*</span></label>
           <input type="url" id="fb" name="fb" placeholder="https://www.facebook.com/yourname" required autocomplete="off" data-err="Please enter your Facebook profile URL.">
         </div>
@@ -773,6 +814,13 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       </div>
     </section>
 
+    <div class="card othernotice" id="otherCityNotice" style="display:none">
+      <p>We may be able to service your area! Please contact us via chat so we can check availability.<br>
+      <span lang="tl">Maaari kaming makapagbigay ng serbisyo sa inyong lugar! Mangyaring makipag-ugnayan sa amin sa pamamagitan ng chat para masuri ang availability.</span></p>
+      <a class="fbchatbtn" id="fbChatLink" href="#" target="_blank" rel="noopener">Chat with us on Facebook</a>
+    </div>
+
+    <div id="restOfForm">
     <section class="card">
       <h2><span class="step">2</span>Your Loads</h2>
       <div class="loads" id="loads"></div>
@@ -873,6 +921,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 
     <button type="submit" class="submit" id="submitBtn" disabled>Book for Pickup 🧺</button>
     <p class="note">* Prices are estimates. Final amount is confirmed after weighing in-store.</p>
+    </div>
   </form>
 
   <div class="done" id="done">
@@ -894,6 +943,56 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 <span class="fsub">PICKUP &amp; DELIVERY — <span class="nowrap">WEEKDAYS 8AM–9PM</span> ・ <span class="nowrap">WEEKENDS 9AM–7PM</span></span></footer>
 
 <script>
+// ===== City → Barangay logic + service-area gating =====
+// TODO: set your shop's real Facebook Page URL before deploying.
+const SHOP_FB_PAGE_URL = "https://www.facebook.com/PASTE_YOUR_PAGE_HERE";
+const CITY_BARANGAYS = {
+  Mandaluyong: ["Barangka Ilaya", "Barangka Itaas", "Barangka Drive", "Malamig", "Buayang Bato", "Highway Hills"],
+  Pasig: ["Kapitolyo", "Pineda", "Bagong Ilog", "Buting", "Sumilang", "Santa Rosa", "Oranbo"],
+};
+const cityInput = document.getElementById("city");
+const barangayField = document.getElementById("barangayField");
+const barangayInput = document.getElementById("barangay");
+const otherCityNotice = document.getElementById("otherCityNotice");
+const restOfForm = document.getElementById("restOfForm");
+document.getElementById("fbChatLink").href = SHOP_FB_PAGE_URL;
+
+// "Other" city: the rest of the form is unusable until they contact us —
+// disabling (not just hiding) every control also excludes them from
+// constraint validation and from FormData, so there's no way to submit
+// a hidden required field by accident.
+function setRestOfFormEnabled(enabled) {
+  otherCityNotice.style.display = enabled ? "none" : "";
+  restOfForm.style.display = enabled ? "" : "none";
+  restOfForm.querySelectorAll("input, select, textarea, button").forEach(el => { el.disabled = !enabled; });
+  if (enabled) {
+    // restore the T&C-gated disabled state rather than force-enabling it
+    document.getElementById("submitBtn").disabled = !document.getElementById("tncAgree").checked;
+  }
+}
+
+function updateCityLogic() {
+  const city = cityInput.value;
+  const barangays = CITY_BARANGAYS[city];
+  if (barangays) {
+    barangayInput.innerHTML = `<option value="" selected disabled>Select your barangay</option>` +
+      barangays.map(b => `<option value="${b}">${b}</option>`).join("");
+    barangayField.classList.add("show");
+    barangayInput.required = true;
+  } else {
+    barangayField.classList.remove("show");
+    barangayInput.required = false;
+    barangayInput.value = "";
+    barangayInput.setCustomValidity("");
+  }
+  setRestOfFormEnabled(city !== "Other");
+}
+cityInput.addEventListener("change", updateCityLogic);
+barangayInput.dataset.err = "Please select your barangay.";
+barangayInput.addEventListener("invalid", () => barangayInput.setCustomValidity(barangayInput.dataset.err));
+barangayInput.addEventListener("input", () => barangayInput.setCustomValidity(""));
+updateCityLogic(); // sync initial state (no-op while City is still blank)
+
 // ===== Pricing master (sync with GAS sheet later) =====
 // model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
@@ -1411,6 +1510,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     contactVia: form.contactvia.value,
     address: form.address.value.trim(),
     city: form.city.value.trim(),
+    barangay: barangayField.classList.contains("show") ? barangayInput.value.trim() : "",
     pickup: `${pickupDate.value} ${pickupTime.value}`,
     delivery: deliveryTime.value === "Lalamove"
       ? "Via Lalamove (customer-arranged)"

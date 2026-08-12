@@ -41,7 +41,7 @@ const HEADERS = [
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
   "T&C Agreed", "Speed", "Notes", "Promo Code", "Discount", "Total (PHP)",
   "Assigned Rider", "Rider ID", "Distance (km)", "Assigned At",
-  "City", "Status Updated By", "Status Updated At",
+  "City", "Status Updated By", "Status Updated At", "Barangay",
 ];
 const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
 const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
@@ -125,11 +125,11 @@ function doPost(e) {
   // Auto-assign the nearest on-duty rider — best-effort, computed BEFORE the
   // row is appended so the result lands in the same write (no second pass).
   // Any failure here (bad API key, geocoding down, etc.) must never stop the
-  // order from being recorded. Geocode Address + City together — City alone
-  // isn't stored back into the Address column, but leaving it out of the
-  // geocoding query would badly hurt accuracy (many streets/barangays share
-  // names across different Metro Manila cities).
-  const fullAddress = [data.address, data.city].filter(Boolean).join(", ");
+  // order from being recorded. Geocode Address + Barangay + City together —
+  // City/Barangay alone aren't stored back into the Address column, but
+  // leaving them out of the geocoding query would badly hurt accuracy (many
+  // streets/barangays share names across different Metro Manila cities).
+  const fullAddress = [data.address, data.barangay, data.city].filter(Boolean).join(", ");
   let assign = { ok: false, reason: "error" };
   try {
     const pickupISO = (data.pickup || "").slice(0, 10); // "YYYY-MM-DD HH:MM" -> date part
@@ -168,6 +168,7 @@ function doPost(e) {
     data.city || "",
     "", // Status Updated By — blank until an admin changes the status
     "", // Status Updated At
+    data.barangay || "",
   ]);
 
   // count the use only after the order is safely recorded
@@ -182,7 +183,7 @@ function doPost(e) {
       "👤 " + data.name + " / " + data.phone +
       (data.fb ? " / FB: " + data.fb : "") + "\n" +
       "📱 Contact via: " + (data.contactVia || "-") + "\n" +
-      "📍 " + data.address + (data.city ? ", " + data.city : "") + "\n" +
+      "📍 " + data.address + ([data.barangay, data.city].filter(Boolean).length ? ", " + [data.barangay, data.city].filter(Boolean).join(", ") : "") + "\n" +
       "🚚 Pickup: " + (data.pickup || "-") + "\n" +
       "🏠 Delivery: " + (data.delivery || "-") + "\n\n" +
       loadsText + "\n\n" +
@@ -729,7 +730,8 @@ function handleReassignRider(data) {
 
   const address = String(orderRow[HEADERS.indexOf("Address")]);
   const city = String(orderRow[HEADERS.indexOf("City")] || "");
-  const fullAddress = [address, city].filter(Boolean).join(", ");
+  const barangay = String(orderRow[HEADERS.indexOf("Barangay")] || "");
+  const fullAddress = [address, barangay, city].filter(Boolean).join(", ");
   const loc = geocodeAddress(fullAddress);
   const distanceKm = (loc && rider.baseLat != null && rider.baseLng != null)
     ? haversineKm(loc.lat, loc.lng, rider.baseLat, rider.baseLng) : null;

@@ -29,7 +29,11 @@
   - **Rush / Super Rush** はデリバリー日を固定しない(集荷日以降を自由選択)。**同日**デリバリーを選んだ時だけ集荷時刻に応じた固定対応表(仕様書§6.1)で絞り込み、該当枠が無ければ「Lalamove(customer arranges/pays)」に自動切替。後日デリバリーはその日の全スロット自由選択
   - スロット上限 = その日のライダー人数 × 4(各ライダー1枠4件、1人=4件 / 2人=8件、デフォルト2人=8件/枠)。admin.html の Rider Management で日付ごとに1/2を設定でき、人数を減らすとその日のスロット上限が下がる。満枠・ブロック済みスロットは FULL 表示で選択不可
 - **連絡先**: Facebook Profile URL(必須・`https://www.facebook.com/yourname` 形式)と希望連絡手段(SMS / Messenger)
-- **住所**: 番地・通り・バランガイ欄に加えて **City 欄が必須**(自動アサインのジオコーディング精度向上のため、住所とセットでAPIに渡されます)
+- **City ドロップダウン**: Taguig / BGC (Bonifacio Global City) / Makati / Mandaluyong / Pasig / Other から選択(必須)
+  - Mandaluyong・Pasig を選ぶと **Barangay ドロップダウン**が続けて表示される(必須、各市固有の選択肢)
+  - Taguig / BGC / Makati は Barangay 不要でそのまま次に進める
+  - **Other** を選ぶとフォームの続きが丸ごと無効化され、「対応可能かもしれないので直接ご相談ください」の案内(EN+TL)と Facebook Messenger への誘導ボタンを表示(サービスエリア外を自動アサインしないためのガード)
+  - City + Barangay は住所欄とセットで自動アサインのジオコーディングAPIに渡される(精度向上のため)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
 
 ## 管理画面(admin.html)
@@ -73,6 +77,9 @@ python3 -m http.server 8787
 - `ADDONS` — アドオン(`per: "load"` はロード数×fee、`per: "order"` は1回限りの固定額)
 - `SEPARATION` — 洗い分けの選択肢
 - `slotHours` — 集配スロットの時間帯(平日/週末)。スロット上限は `gas/Code.gs` の `SLOT_CAP`
+- `CITY_BARANGAYS` — Barangayドロップダウンが必要な市とその選択肢(現在 Mandaluyong / Pasig)
+- `SHOP_FB_PAGE_URL` — **要設定**。City=Other選択時の「Chat with us on Facebook」ボタンの遷移先。
+  デプロイ前に自店のFacebookページURLに書き換えること(初期値はプレースホルダーのまま)
 
 ## Google Apps Script(GAS)連携
 
@@ -98,8 +105,9 @@ payload の形:
   "phone": "0917 123 4567",
   "fb": "https://www.facebook.com/juandelacruz",
   "contactVia": "Facebook Messenger",
-  "address": "123 Sample St., Brgy. Uno",
-  "city": "Quezon City",
+  "address": "123 Sample St.",
+  "city": "Pasig",
+  "barangay": "Kapitolyo",
   "pickup": "2026-07-12 08:00",
   "delivery": "2026-07-14 18:00",
   "loads": [{ "type": "assorted", "label": "Assorted Clothes", "qty": 7, "unit": "kg", "amount": 240 }],
