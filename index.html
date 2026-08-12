@@ -753,11 +753,15 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
         </div>
         <div class="field" style="flex-basis: 100%;">
           <label class="lbl" for="address">Address<span class="req">*</span></label>
-          <input type="text" id="address" name="address" placeholder="House No., Street, Barangay, City" required autocomplete="street-address" data-err="Please enter your address.">
+          <input type="text" id="address" name="address" placeholder="House No., Street, Barangay" required autocomplete="street-address" data-err="Please enter your address.">
         </div>
         <div class="field">
-          <label class="lbl" for="fb">Facebook (Name or Link)</label>
-          <input type="text" id="fb" name="fb" placeholder="facebook.com/yourname" autocomplete="off">
+          <label class="lbl" for="city">City<span class="req">*</span></label>
+          <input type="text" id="city" name="city" placeholder="Quezon City" required autocomplete="address-level2" data-err="Please enter your city.">
+        </div>
+        <div class="field">
+          <label class="lbl" for="fb">Facebook Profile URL<span class="req">*</span></label>
+          <input type="url" id="fb" name="fb" placeholder="https://www.facebook.com/yourname" required autocomplete="off" data-err="Please enter your Facebook profile URL.">
         </div>
         <div class="field">
           <label class="lbl" for="contactvia">Best Way to Contact You</label>
@@ -1386,12 +1390,6 @@ promoInput.addEventListener("input", () => { if (appliedPromo && promoInput.valu
 document.getElementById("orderForm").addEventListener("submit", async e => {
   e.preventDefault();
   const form = e.target;
-  // Messenger only works if we have their Facebook
-  if (form.contactvia.value === "Facebook Messenger" && !form.fb.value.trim()) {
-    form.fb.setCustomValidity("Please add your Facebook name or link so we can reach you on Messenger.");
-  } else {
-    form.fb.setCustomValidity("");
-  }
   if (!form.reportValidity()) return;
 
   const btn = document.getElementById("submitBtn");
@@ -1412,6 +1410,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     fb: form.fb.value.trim(),
     contactVia: form.contactvia.value,
     address: form.address.value.trim(),
+    city: form.city.value.trim(),
     pickup: `${pickupDate.value} ${pickupTime.value}`,
     delivery: deliveryTime.value === "Lalamove"
       ? "Via Lalamove (customer-arranged)"
@@ -1471,7 +1470,6 @@ document.querySelectorAll("#orderForm [required]").forEach(el => {
   el.addEventListener("invalid", () => el.setCustomValidity(el.dataset.err || "Please fill out this field."));
   el.addEventListener("input", () => el.setCustomValidity(""));
 });
-document.getElementById("fb").addEventListener("input", e => e.target.setCustomValidity(""));
 
 // first row
 addLoadRow(0);

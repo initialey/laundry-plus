@@ -14,8 +14,10 @@
 
 ## §2 顧客情報
 
-- 必須: Name / Mobile No. / Address
-- 任意: Facebook(Name or Link)— ただし連絡手段に Facebook Messenger を選んだ場合は必須
+- 必須: Name / Mobile No. / Address / **City** / **Facebook Profile URL**
+  (`https://www.facebook.com/yourname` 形式、`type="url"` によりブラウザ側でURL形式を検証)
+- Address欄は番地・通り・バランガイのみ(City欄が別に独立)。ジオコーディング(ライダー自動アサイン)は
+  Address + City を結合した文字列で行う — Cityを外すと同名の通りが複数の都市に存在する場合に精度が落ちるため
 - Best Way to Contact You: Text / SMS(デフォルト)、Facebook Messenger
 
 ## §3 サービスと料金
@@ -199,7 +201,10 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
   (Date / Count / Updated At)に日付ごとの人数と更新日時を保存し、未設定の日は DEFAULT_RIDERS(=2)。
   予約数(集荷+配達、CANCELLED除外)が `人数×4` 以上、または管理画面でBLOCKされたスロットは「FULL」表示で選択不可。
 - ライダー人数は **admin.html の Rider Management パネル**で日付ごとに設定(1/2)。フォームは
-  `?action=slots` の `cap`(= 人数×4)を読むだけなので、人数変更に自動追従(フォーム側の改修不要)。
+  `?action=slots` の `cap`(= 人数×4、または下記の手動上書き値)を読むだけなので、変更に自動追従(フォーム側の改修不要)。
+- **Slot Capacity Override**: 上記の自動計算(人数×4)を日付ごとに手動で上書きできる
+  (admin.html の Rider Management パネル内)。`Riders` シートの4列目(Capacity Override)に保存され、
+  設定があればライダー人数に関わらずその値がそのままスロット上限になる。未設定の日は従来通り人数×4。
 
 ### §6.1 Rush / Super Rush 配達枠 固定対応表(ルックアップ)
 
@@ -241,21 +246,30 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 - **料金計算はフォーム(index.html)側のみ**で行い、GASは `total` を記録するだけ(計算ロジックの二重管理をしない)。
 - `GET ?action=slots&date=` … スロット空き状況(公開)/ `GET ?action=day&date=&key=` … 管理画面用の予約一覧(要ADMIN_KEY)/ `POST {action:"block"}` … スロットのBLOCK/UNBLOCK。
 - `GET ?action=promo&code=` … プロモコード検証(公開)/ `GET ?action=promos&key=` … コード一覧(要ADMIN_KEY)/ `POST {action:"promo", op:"save"|"toggle"|"delete"}` … コード管理。PromoCodesシートに保存。
-- `GET ?action=riders&date=&key=` … その日のライダー人数取得(要ADMIN_KEY)/ `POST {action:"riders", date, count}` … 人数設定。Ridersシートに保存(DEFAULT値を設定すると行は削除)。
+- `GET ?action=riders&date=&key=` … その日のライダー人数・スロット上限・手動上書き値取得(要ADMIN_KEY、`capOverride` を含む)/
+  `POST {action:"riders", date, count?, capOverride?}` … 人数設定・スロット上限の手動上書き。count/capOverrideは
+  どちらか一方だけ送っても他方は変更されない(count省略でcapOverrideだけ更新、など)。Ridersシートに保存
+  (DEFAULT人数かつ上書きなしの場合は行ごと削除)。
 - `GET ?action=riderRoster&key=` … ライダー名簿取得(要ADMIN_KEY)/ `POST {action:"riderRoster", op:"save"|"toggle"|"delete", riderId?, name, chatId, baseAddress}` … 名簿の登録・編集・有効/無効切替・削除。RiderRosterシートに保存(住所変更時のみ再ジオコード)。
 - `GET ?action=riderSchedule&date=&key=` … 指定日の全ライダーと出勤状況(要ADMIN_KEY)/ `POST {action:"riderSchedule", date, entries:[{riderId, onDuty}]}` … その日の出勤を保存(RiderScheduleシート、同日は上書き)。
 - `POST {action:"reassignRider", receiptNo, riderId}` … 注文の担当ライダーを手動で再アサインし、新しい担当者にTelegram再通知(要ADMIN_KEY)。
+- `POST {action:"updateStatus", receiptNo, status, updatedBy}` … 注文のStatusを変更し、`Status Updated By` /
+  `Status Updated At` に担当者名と日時を記録(要ADMIN_KEY、`status` はSTATUSESのいずれかでない場合は拒否)。
+  `GET ?action=day` のbookingsに `statusUpdatedBy` / `statusUpdatedAt` として返る。
 - `setupSheet()` は Orders / BlockedSlots / PromoCodes / Riders / RiderRoster / RiderSchedule の各シートを作成。
 
 ### §8.1 ライダー自動アサイン機能
 
-- 注文が確定すると、住所を Google Geocoding API で座標変換し、その日 **Active かつ出勤中(On Duty)** のライダーのうち
-  拠点座標から直線距離(Haversine)が最も近い1人へ自動アサインする。
-- Ordersシートに `Assigned Rider` / `Rider ID` / `Distance (km)` / `Assigned At` の4列を追加記録し、
-  アサインされたライダーへ以下のフォーマットでTelegram通知を送信する:
+- 注文が確定すると、**Address + City を結合した文字列**を Google Geocoding API で座標変換し、その日
+  **Active かつ出勤中(On Duty)** のライダーのうち拠点座標から直線距離(Haversine)が最も近い1人へ自動アサインする
+  (Cityを含めないと同名の通りが複数都市に存在する場合に誤った座標になりうるため必ず結合する)。Ordersシートの
+  Address列自体にはCityを結合せず、Address/Cityは別列のまま保存する。
+- Ordersシートに `Assigned Rider` / `Rider ID` / `Distance (km)` / `Assigned At` / `City` /
+  `Status Updated By` / `Status Updated At` の各列を追加記録し(いずれも既存データを壊さないよう末尾に追加)、
+  アサインされたライダーへ以下のフォーマットでTelegram通知を送信する(住所欄はAddress+Cityの結合値):
   ```
   🛵 New Order Assigned!
-  👤 Customer: [名前] 📍 Address: [住所] 📦 Order: [サービス内容] 🕐 Pickup: [日時] 🕐 Delivery: [日時] 💰 Total: ₱[金額]
+  👤 Customer: [名前] 📍 Address: [住所, City] 📦 Order: [サービス内容] 🕐 Pickup: [日時] 🕐 Delivery: [日時] 💰 Total: ₱[金額]
   📌 Map: https://maps.google.com/?q=[緯度],[経度]
   ```
 - 住所が座標変換できない場合、またはその日 出勤中のライダーが0人の場合は `未アサイン` として記録し、
