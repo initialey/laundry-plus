@@ -14,11 +14,28 @@
 
 ## §2 顧客情報
 
-- 必須: Name / Mobile No. / Address / **City** / **Facebook Profile URL**
+- 必須: Name / Mobile No. / Address / **City**(ドロップダウン) / **Barangay**(City次第で条件付き必須) / **Facebook Profile URL**
   (`https://www.facebook.com/yourname` 形式、`type="url"` によりブラウザ側でURL形式を検証)
-- Address欄は番地・通り・バランガイのみ(City欄が別に独立)。ジオコーディング(ライダー自動アサイン)は
-  Address + City を結合した文字列で行う — Cityを外すと同名の通りが複数の都市に存在する場合に精度が落ちるため
+- Address欄は番地・通りのみ(City/Barangayは別欄で独立)。ジオコーディング(ライダー自動アサイン)は
+  Address + Barangay + City を結合した文字列で行う — 外すと同名の通り/バランガイが複数の市に存在する場合に精度が落ちるため
 - Best Way to Contact You: Text / SMS(デフォルト)、Facebook Messenger
+
+### §2.1 City / Barangay 選択ロジック
+
+- **City ドロップダウン**(選択肢、この順で表示): Taguig / BGC (Bonifacio Global City) / Makati /
+  Mandaluyong / Pasig / Other
+- **Taguig / BGC / Makati**: Barangay不要、そのままフォームの続きに進める
+- **Mandaluyong**: Barangayドロップダウン(必須)が表示される。選択肢: Barangka Ilaya / Barangka Itaas /
+  Barangka Drive / Malamig / Buayang Bato / Highway Hills
+- **Pasig**: Barangayドロップダウン(必須)が表示される。選択肢: Kapitolyo / Pineda / Bagong Ilog /
+  Buting / Sumilang / Santa Rosa / Oranbo
+- **Other**: フォームの続き(Loads以降、T&C、送信ボタンまで)を丸ごと非表示 + `disabled` にし
+  (`disabled`属性を付与するため、隠れた必須項目が誤送信されることもない)、以下を表示:
+  - "We may be able to service your area! Please contact us via chat so we can check availability."
+  - (TL併記)"Maaari kaming makapagbigay ng serbisyo sa inyong lugar! ..."
+  - 「Chat with us on Facebook」ボタン → `SHOP_FB_PAGE_URL`(`index.html`内の定数、要デプロイ前設定)
+- Barangayフィールドはフェードイン表示(`max-height`+`opacity`トランジション)
+- UI順序: Address → City → Barangay(条件付き)→ Facebook Profile URL(全幅)→ Best Way to Contact You
 
 ## §3 サービスと料金
 
@@ -260,16 +277,16 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 
 ### §8.1 ライダー自動アサイン機能
 
-- 注文が確定すると、**Address + City を結合した文字列**を Google Geocoding API で座標変換し、その日
+- 注文が確定すると、**Address + Barangay + City を結合した文字列**を Google Geocoding API で座標変換し、その日
   **Active かつ出勤中(On Duty)** のライダーのうち拠点座標から直線距離(Haversine)が最も近い1人へ自動アサインする
-  (Cityを含めないと同名の通りが複数都市に存在する場合に誤った座標になりうるため必ず結合する)。Ordersシートの
-  Address列自体にはCityを結合せず、Address/Cityは別列のまま保存する。
+  (Barangay/Cityを含めないと同名の通り/バランガイが複数都市に存在する場合に誤った座標になりうるため必ず結合する)。
+  Ordersシートの Address列自体にはBarangay/Cityを結合せず、Address/Barangay/Cityは別列のまま保存する。
 - Ordersシートに `Assigned Rider` / `Rider ID` / `Distance (km)` / `Assigned At` / `City` /
-  `Status Updated By` / `Status Updated At` の各列を追加記録し(いずれも既存データを壊さないよう末尾に追加)、
-  アサインされたライダーへ以下のフォーマットでTelegram通知を送信する(住所欄はAddress+Cityの結合値):
+  `Status Updated By` / `Status Updated At` / `Barangay` の各列を追加記録し(いずれも既存データを壊さないよう末尾に追加)、
+  アサインされたライダーへ以下のフォーマットでTelegram通知を送信する(住所欄はAddress+Barangay+Cityの結合値):
   ```
   🛵 New Order Assigned!
-  👤 Customer: [名前] 📍 Address: [住所, City] 📦 Order: [サービス内容] 🕐 Pickup: [日時] 🕐 Delivery: [日時] 💰 Total: ₱[金額]
+  👤 Customer: [名前] 📍 Address: [住所, Barangay, City] 📦 Order: [サービス内容] 🕐 Pickup: [日時] 🕐 Delivery: [日時] 💰 Total: ₱[金額]
   📌 Map: https://maps.google.com/?q=[緯度],[経度]
   ```
 - 住所が座標変換できない場合、またはその日 出勤中のライダーが0人の場合は `未アサイン` として記録し、
