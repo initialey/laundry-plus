@@ -28,7 +28,7 @@
   - Standard=集荷2日後以降 / 24 Hours=翌日以降、いずれも全スロット自由選択
   - **Rush / Super Rush** はデリバリー日を固定しない(集荷日以降を自由選択)。**同日**デリバリーを選んだ時だけ集荷時刻に応じた固定対応表(仕様書§6.1)で絞り込み、該当枠が無ければ「Lalamove(customer arranges/pays)」に自動切替。後日デリバリーはその日の全スロット自由選択
   - スロット上限 = その日のライダー人数 × 4(各ライダー1枠4件、1人=4件 / 2人=8件、デフォルト2人=8件/枠)。admin.html の Rider Management で日付ごとに1/2を設定でき、人数を減らすとその日のスロット上限が下がる。満枠・ブロック済みスロットは FULL 表示で選択不可
-- **連絡先**: Facebook Profile URL(必須・`https://www.facebook.com/yourname` 形式)と希望連絡手段(SMS / Messenger)
+- **連絡先**: Facebook Profile URL(**任意**・`https://www.facebook.com/yourname` 形式。空欄でOK、入力する場合のみURL形式を検証)と希望連絡手段(SMS / Messenger)
 - **City ドロップダウン**: Taguig / BGC (Bonifacio Global City) / Makati / Mandaluyong / Pasig / Other から選択(必須)
   - Mandaluyong・Pasig を選ぶと **Barangay ドロップダウン**が続けて表示される(必須、各市固有の選択肢)
   - Taguig / BGC / Makati は Barangay 不要でそのまま次に進める
@@ -45,6 +45,7 @@
 - アクセスには管理キーが必要: `gas/Code.gs` の `ADMIN_KEY` を自分だけの値に変更し、admin.html の Key 欄に同じ値を入力(端末に保存されます)
 - ブロック情報はスプレッドシートの `BlockedSlots` シートに保存(直接編集も可)
 - **Slot Capacity Override**(Rider Management パネル内): 日付ごとに1スロットあたりの上限数を手動で直接指定できる(ライダー人数×4の自動計算を上書き)。未設定の日はこれまで通り自動計算のデフォルトを使用。Set で設定・Clear で解除、値は `Riders` シートの4列目(Capacity Override)に保存
+- **スロットの手動 +1 / −1 調整**: 各スロットに **+1 / −1** ボタンがあり、表示は「使用数 / 上限数」(例: `3 / 8`)。フォーム以外で受けた予約(電話・店頭など)を **+1** で枠として消費し、**−1** で戻せる。調整値は追加予約としてカウントされ、**予約フォーム側の空き計算にも即反映**される(実質空き = 上限 − フォーム予約数 − 手動調整数)。調整が入っているスロットには「+N manual bookings」の注記を表示。調整値は0未満にはならず(自分で足した分だけ戻せる)、`SlotAdjustments` シート(日付 / タイムスロット / 調整数 / 更新日時)に保存
 - **注文一覧のステータス管理**: 各予約行にステータスのドロップダウン(NEW / WASHING / READY / PICKED UP / CANCELLED)。変更すると即座にSheetsへ反映され、「Your Name」欄に登録した担当者名と変更日時が記録・表示される(未入力の場合は先にYour Nameの入力を促される)
 - **Facebookリンク**: 各予約行にFBリンクが表示され、タップでお客さんのFacebookページに遷移
 - **Riders パネル**(ライダー名簿・出勤管理・自動アサイン)

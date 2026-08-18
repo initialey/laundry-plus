@@ -14,8 +14,9 @@
 
 ## §2 顧客情報
 
-- 必須: Name / Mobile No. / Address / **City**(ドロップダウン) / **Barangay**(City次第で条件付き必須) / **Facebook Profile URL**
-  (`https://www.facebook.com/yourname` 形式、`type="url"` によりブラウザ側でURL形式を検証)
+- 必須: Name / Mobile No. / Address / **City**(ドロップダウン) / **Barangay**(City次第で条件付き必須)
+- 任意: **Facebook Profile URL**(`https://www.facebook.com/yourname` 形式)。空欄で送信可。
+  ただし `type="url"` のため、**入力した場合のみ**URL形式を検証する(不正な文字列は送信不可)
 - Address欄は番地・通りのみ(City/Barangayは別欄で独立)。ジオコーディング(ライダー自動アサイン)は
   Address + Barangay + City を結合した文字列で行う — 外すと同名の通り/バランガイが複数の市に存在する場合に精度が落ちるため
 - Best Way to Contact You: Text / SMS(デフォルト)、Facebook Messenger
@@ -252,6 +253,22 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
 | 5:00–6:30 PM 以降 | なし → Lalamove |
 
 Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arranged)` として記録。
+
+### §6.2 スロットの手動 +1 / −1 調整
+
+フォーム外で受けた予約(電話・店頭・LINE等)も枠を消費させるための仕組み。
+
+- admin.html のスケジュール一覧で、各日付・各タイムスロットに **+1 / −1** ボタンを表示。
+  カウント表示は「使用数 / 上限数」(例: `3 / 8`)で、手動調整分を含んだ数値。
+- **調整値は「追加の予約数」としてカウントする**:
+  **実質空き = 上限 − フォーム予約数 − 手動調整数**
+  つまり **+1 = 枠を1つ消費**(手動予約を入れた)、**−1 = 枠を1つ戻す**(その手動予約を取り消した)。
+- 調整値は **0未満にならない**(自分で足した分だけ戻せる)。フォーム経由の実予約の取り消しは
+  従来通り Orders シートの Status を `CANCELLED` にすることで枠が戻る(調整機能とは独立)。
+- 保存先は **`SlotAdjustments` シート**(Date / Time Slot / Adjustment / Updated At)。
+  調整値が0になった行は削除してシートを綺麗に保つ。
+- 公開エンドポイント `?action=slots` の `counts` に調整数を加算して返すため、
+  **予約フォーム側は改修不要で自動追従**する(手動調整だけで上限に達したスロットも FULL 表示になる)。
 
 ## §7 見積もりの注意
 

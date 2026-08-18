@@ -801,8 +801,8 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
           </select>
         </div>
         <div class="field" style="flex-basis: 100%;">
-          <label class="lbl" for="fb">Facebook Profile URL<span class="req">*</span></label>
-          <input type="url" id="fb" name="fb" placeholder="https://www.facebook.com/yourname" required autocomplete="off" data-err="Please enter your Facebook profile URL.">
+          <label class="lbl" for="fb">Facebook Profile URL <small>(optional)</small></label>
+          <input type="url" id="fb" name="fb" placeholder="https://www.facebook.com/yourname" autocomplete="off" data-err="Please enter a valid Facebook profile URL, or leave it blank.">
         </div>
         <div class="field">
           <label class="lbl" for="contactvia">Best Way to Contact You</label>
@@ -1562,8 +1562,10 @@ document.getElementById("gotoNotesTl").addEventListener("click", focusNotes);
 
 document.getElementById("againBtn").addEventListener("click", () => location.reload());
 
-// Force English validation messages regardless of the browser's language
-document.querySelectorAll("#orderForm [required]").forEach(el => {
+// Force English validation messages regardless of the browser's language.
+// #fb is optional but still type=url, so it needs the same treatment for the
+// case where someone types a malformed URL rather than leaving it blank.
+document.querySelectorAll("#orderForm [required], #orderForm #fb").forEach(el => {
   el.addEventListener("invalid", () => el.setCustomValidity(el.dataset.err || "Please fill out this field."));
   el.addEventListener("input", () => el.setCustomValidity(""));
 });
