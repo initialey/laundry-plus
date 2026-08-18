@@ -57,6 +57,16 @@ const RIDERS_SHEET = "Riders";
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
 const BLOCKED_SHEET = "BlockedSlots";
 
+// Manual per-slot booking adjustments (managed from admin.html's +1/-1
+// buttons). Used for bookings taken outside the form — walk-ins, phone
+// orders — so they still consume slot capacity on the booking form.
+// The stored number counts as EXTRA BOOKINGS, i.e. effective availability
+// is `cap - formBookings - adjustment`: +1 consumes a slot, -1 gives one
+// back. Never stored below 0 (you can only take back adjustments you
+// yourself added; real cancellations are handled by the CANCELLED status).
+const SLOT_ADJUST_SHEET = "SlotAdjustments";
+const SLOT_ADJUST_HEADERS = ["Date", "Time Slot", "Adjustment", "Updated At"];
+
 // Promo codes (managed from admin.html). Columns:
 //   Code / Type / Value / Valid Until / Active / Notes /
 //   Max Uses / Used Count / One Time Per Customer
@@ -91,6 +101,7 @@ function doPost(e) {
   if (data.action === "riderSchedule") return handleRiderSchedule(data); // from admin.html (daily attendance)
   if (data.action === "reassignRider") return handleReassignRider(data); // from admin.html (manual reassignment)
   if (data.action === "updateStatus") return handleUpdateStatus(data); // from admin.html (order status dropdown)
+  if (data.action === "slotAdjust") return handleSlotAdjust(data); // from admin.html (+1/-1 slot buttons)
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -235,6 +246,12 @@ function doGet(e) {
       if (String(row[idx.status]) === "CANCELLED") return;
       counts[slot] = (counts[slot] || 0) + 1;
     });
+    // Manual adjustments count as extra bookings, so off-form bookings
+    // (walk-ins, phone orders) consume capacity on the booking form too.
+    const adjustments = slotAdjustmentsForDate(p.date);
+    Object.keys(adjustments).forEach(function (slot) {
+      counts[slot] = (counts[slot] || 0) + adjustments[slot];
+    });
     getBlocked(p.date).forEach(function (slot) {
       counts[slot] = Math.max(counts[slot] || 0, cap); // report as full
     });
@@ -263,6 +280,7 @@ function doGet(e) {
     return jsonOut({
       ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date),
       capOverride: capacityOverrideForDate(p.date), blocked: getBlocked(p.date), bookings: bookings,
+      adjustments: slotAdjustmentsForDate(p.date),
     });
   }
 
@@ -470,6 +488,67 @@ function handleBlock(data) {
     }
   }
   return jsonOut({ ok: true, blocked: getBlocked(data.date) });
+}
+
+// ===== Manual slot adjustments (+1 / -1 from admin.html) =====
+
+function getSlotAdjustSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SLOT_ADJUST_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(SLOT_ADJUST_SHEET);
+    sheet.appendRow(SLOT_ADJUST_HEADERS);
+  }
+  return sheet;
+}
+
+// { "08:00": 2, ... } — manual extra-booking counts for a date. Slots with
+// no adjustment (or an adjustment of 0) are simply absent from the map.
+function slotAdjustmentsForDate(date) {
+  const sheet = getSlotAdjustSheet();
+  const out = {};
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, SLOT_ADJUST_HEADERS.length).getValues().forEach(function (r) {
+      if (String(r[0]) !== date) return;
+      const n = Number(r[2]) || 0;
+      if (n > 0) out[String(r[1])] = n;
+    });
+  }
+  return out;
+}
+
+// POST { action:"slotAdjust", key, date, slot, delta: 1|-1 }
+// Bumps the manual booking count for one slot. Clamped at 0 — "-1" only
+// takes back an adjustment previously added here, it can never push the
+// effective count below what the real (form) bookings already occupy.
+function handleSlotAdjust(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.date || !data.slot) return jsonOut({ ok: false, error: "missing date/slot" });
+  const delta = Math.round(Number(data.delta) || 0);
+  if (delta !== 1 && delta !== -1) return jsonOut({ ok: false, error: "delta must be 1 or -1" });
+
+  const sheet = getSlotAdjustSheet();
+  let rowNum = -1, cur = 0;
+  if (sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, SLOT_ADJUST_HEADERS.length).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === data.date && String(rows[i][1]) === data.slot) {
+        rowNum = i + 2;
+        cur = Number(rows[i][2]) || 0;
+        break;
+      }
+    }
+  }
+  const next = Math.max(0, cur + delta);
+  const now = new Date();
+  if (next === 0) {
+    if (rowNum > 0) sheet.deleteRow(rowNum); // keep the sheet tidy: 0 means "no adjustment"
+  } else if (rowNum > 0) {
+    sheet.getRange(rowNum, 3, 1, 2).setValues([[next, now]]);
+  } else {
+    sheet.appendRow(["'" + data.date, "'" + data.slot, next, now]);
+  }
+  return jsonOut({ ok: true, date: data.date, slot: data.slot, adjustment: next, adjustments: slotAdjustmentsForDate(data.date) });
 }
 
 // ===== Rider roster, attendance & auto-assignment =====
@@ -973,7 +1052,8 @@ function setupSheet() {
   if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
   if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS);
   sheet.setFrozenRows(1);
-  getBlockedSheet(); // create the BlockedSlots sheet too
+  getBlockedSheet();    // create the BlockedSlots sheet too
+  getSlotAdjustSheet(); // and the SlotAdjustments sheet (manual +1/-1)
   const riders = getRidersSheet(); // create the Riders sheet too (slot-capacity headcount)
   // backfill the 4th header on a pre-existing Riders sheet from before the
   // Slot Capacity Override feature — safe no-op if it's already there

@@ -105,6 +105,22 @@ button.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow
   cursor: pointer;
 }
 .slot .block:hover { border-color: var(--red); color: var(--red); }
+.slot .adjust { display: flex; gap: 4px; }
+.slot .adj {
+  width: 30px; height: 26px;
+  border: 2px solid #cdeaf8;
+  background: #eef8fd;
+  color: var(--sky-deep);
+  font-family: var(--body);
+  font-weight: 800;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+.slot .adj:hover:not(:disabled) { border-color: var(--sky); background: #fff; }
+.slot .adj:disabled { opacity: .35; cursor: default; }
+.slot .adjnote { margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--pink); }
 .slot.blocked .block { border-color: var(--green); color: var(--green); }
 .bkg { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .bk {
@@ -300,7 +316,8 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
 
   <div class="card">
     <div class="slots" id="slots"><div class="msg">Enter your admin key to load the schedule.</div></div>
-    <div class="legend">Tap BLOCK to close a slot for new bookings (shows as FULL on the form) · UNBLOCK reopens it. Cancelled orders don't count toward the cap.</div>
+    <div class="legend">Tap BLOCK to close a slot for new bookings (shows as FULL on the form) · UNBLOCK reopens it. Cancelled orders don't count toward the cap.<br>
+    Use <b>+1</b> when you take a booking outside the form (walk-in, phone) so it still uses up a slot, and <b>−1</b> to give that slot back. The count shows used / cap, including manual bookings.</div>
   </div>
 
   <div class="card">
@@ -492,15 +509,22 @@ async function load() {
   for (const s of slotsForDate(curDate)) {
     const slot = s.v;
     const bks = (data.bookings || []).filter(b => b.slot === slot);
-    const active = bks.filter(b => b.status !== "CANCELLED").length;
+    const fromForm = bks.filter(b => b.status !== "CANCELLED").length;
+    const adj = (data.adjustments || {})[slot] || 0;
+    const used = fromForm + adj; // manual adjustments count as extra bookings
     const blocked = (data.blocked || []).includes(slot);
-    const cls = blocked ? "blocked" : (active >= cap ? "full" : "");
+    const cls = blocked ? "blocked" : (used >= cap ? "full" : "");
     html += `<div class="slot ${cls}">
       <div class="top">
         <span class="time">${s.label}${s.special ? " ⚠️" : ""}</span>
-        <span class="cnt">${blocked ? "BLOCKED" : `${active}/${cap}${active >= cap ? " FULL" : ""}`}</span>
+        <span class="cnt">${blocked ? "BLOCKED" : `${used} / ${cap}${used >= cap ? " FULL" : ""}`}</span>
+        <span class="adjust">
+          <button class="adj" data-slot="${slot}" data-delta="-1" title="Free up a slot (undo a manual booking)" ${adj <= 0 ? "disabled" : ""}>−1</button>
+          <button class="adj" data-slot="${slot}" data-delta="1" title="Consume a slot (booking taken outside the form)">+1</button>
+        </span>
         <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
       </div>
+      ${adj > 0 ? `<div class="adjnote">+${adj} manual ${adj === 1 ? "booking" : "bookings"} (${fromForm} from the form)</div>` : ""}
       ${bks.length ? `<div class="bkg">` + bks.map(b => `
         <div class="bk ${b.status === "CANCELLED" ? "cancelled" : ""}">
           <span class="tag ${b.type}">${b.type === "pickup" ? "PICKUP" : "DELIVERY"}</span>
@@ -523,8 +547,36 @@ async function load() {
 }
 
 slotsEl.addEventListener("click", async e => {
+  if (busy) return;
+
+  const adjBtn = e.target.closest(".adj");
+  if (adjBtn) {
+    busy = true;
+    adjBtn.textContent = "…";
+    try {
+      const res = await fetch(GAS_ENDPOINT, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "slotAdjust",
+          key: localStorage.getItem("lpAdminKey"),
+          date: toISODate(curDate),
+          slot: adjBtn.dataset.slot,
+          delta: Number(adjBtn.dataset.delta),
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong.");
+    } catch (err) {
+      alert("Couldn't reach the server. Please try again.");
+    } finally {
+      busy = false;
+      load();
+    }
+    return;
+  }
+
   const btn = e.target.closest(".block");
-  if (!btn || busy) return;
+  if (!btn) return;
   busy = true;
   btn.textContent = "…";
   try {
