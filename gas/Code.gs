@@ -98,12 +98,12 @@ const RIDER_SCHEDULE_HEADERS = ["Date", "Rider ID", "Rider Name", "On Duty", "Re
 // here, so a stale or tampered client can't set its own price.
 // KEEP IN SYNC with index.html — the shapes are deliberately identical.
 const PRICE_LOAD_TYPES = {
-  assorted: { base: 240, includedKg: 7, extraPerKg: 45 },
+  assorted: { base: 240, includedKg: 7, extraPerKg: 45, loadCapKg: 9 },
   blankets: { base: 240, loadKg: 5 },
   wdpress:  { rate: 210, perKg: true },
-  washonly: { base: 150, includedKg: 7, extraPerKg: 30 },
-  dryonly:  { base: 150, includedKg: 7, extraPerKg: 30 },
-  foldonly: { base: 80,  includedKg: 7, extraPerKg: 15 },
+  washonly: { base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9 },
+  dryonly:  { base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9 },
+  foldonly: { base: 80,  includedKg: 7, extraPerKg: 15, loadCapKg: 9 },
   presskg:     { rate: 155, perKg: true },
   tops:        { rate: 40 },
   bottoms:     { rate: 55 },
@@ -123,8 +123,9 @@ const PRICE_ADDONS = {
 };
 
 // ₱base per full load (up to includedKg), then +extraPerKg per *started*
-// excess kg, never above the price of the next full load.
-// 7kg=₱240, 7.5kg=₱285, 13kg=₱480 (240+6×45=510 would exceed 2×240).
+// excess kg, never above the price of the next full load, and never below
+// one full load (the minimum charge).
+// 7kg=₱240, 7.5kg=₱285, 13kg=₱480 (240+6×45=510 would exceed 2×240), 3kg=₱240.
 function loadPriceFor(t, qty) {
   if (t.rate) return t.perKg ? t.rate * Math.ceil(qty) : Math.round(t.rate * qty);
   if (t.loadKg) return t.base * Math.ceil(qty / t.loadKg);
@@ -133,15 +134,17 @@ function loadPriceFor(t, qty) {
     // 1e-9 absorbs float dust so an exact multiple (14 / 7) doesn't bill 1 excess kg
     const excessKg = Math.max(0, Math.ceil(qty - baseLoads * t.includedKg - 1e-9));
     const capLoads = Math.ceil(qty / t.includedKg - 1e-9);
-    return Math.min(baseLoads * t.base + excessKg * t.extraPerKg, capLoads * t.base);
+    const price = Math.min(baseLoads * t.base + excessKg * t.extraPerKg, capLoads * t.base);
+    return Math.max(t.base, price); // one full load is the minimum charge
   }
   return t.base;
 }
 
-// Machine loads a row counts as — per-load fees scale by this.
+// Machine loads a row occupies — per-load fees scale by this. Capacity is
+// loadCapKg (9kg), deliberately NOT the 7kg pricing tier.
 function loadUnitsFor(t, qty) {
   if (t.loadKg) return Math.ceil(qty / t.loadKg);
-  if (t.extraPerKg) return Math.max(1, Math.round(loadPriceFor(t, qty) / t.base));
+  if (t.loadCapKg) return Math.max(1, Math.ceil(qty / t.loadCapKg - 1e-9));
   return 1;
 }
 

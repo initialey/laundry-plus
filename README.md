@@ -10,8 +10,8 @@
 ## 機能
 
 - **Loads**: サービスと数量(kgまたは枚数)を入れると自動で料金計算
-  - Wash + Dry + Fold: Assorted は **7kgロード方式** — **1ロード = 7kg = 240 PHP**、超過分は **+45 PHP/kg**(切り上げ)。ただし**次のフルロード料金を超える場合はフルロード料金**を適用(例: 7.5kg = 285 / 9.5kg = 375 / 13kg = 480)。Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
-  - per-load料金(スピード・Bleach等)の「load数」= `round(その行の料金 / base)`(最低1)。7.5kg(285)は1ロード、9.5kg(375)は2ロード扱い
+  - Wash + Dry + Fold: Assorted は **7kgロード方式** — **1ロード = 7kg = 240 PHP**、超過分は **+45 PHP/kg**(切り上げ)。ただし**次のフルロード料金を超える場合はフルロード料金**を適用(例: 7.5kg = 285 / 9.5kg = 375 / 13kg = 480)。**最低料金は1ロード分の240 PHP**(3kgでも240)。Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
+  - per-load料金(スピード・Bleach等)の「load数」= **`ceil(kg / 9)`(洗濯機1台9kgまで)**。1–9kg=1 / 9.1–18kg=2 / 18.1–27kg=3 / 27.1–35kg=4。料金の階段(7kg)とロード数の階段(9kg)は別物
   - **料金はGAS側でも再計算され、シートにはサーバー側の金額が記録される**(クライアント値は信用しない)
   - kg単価サービス(210/kg・155/kg)は開始kgごとに切り上げ(1.5kg → 2kg分)
   - 詳細仕様・検証済みテストケース一覧: [docs/laundry_plus_order_form_spec.md](docs/laundry_plus_order_form_spec.md)

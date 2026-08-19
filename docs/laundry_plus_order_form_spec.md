@@ -47,40 +47,50 @@
 高くつくことはない)。
 
 ```
-loads      = ceil(weight / 7)
+loads      = ceil(weight / 7)          # 料金の上限計算にのみ使う内部値
 baseLoads  = floor(weight / 7)
 basePrice  = baseLoads * 240
 excessKg   = ceil(weight - baseLoads * 7)
 excessPrice= excessKg * 45
-total      = min(basePrice + excessPrice, loads * 240)
+total      = max(240, min(basePrice + excessPrice, loads * 240))   # 最低₱240
 ```
 
-**load数(per-load課金の単位)** = `round(total / 240)`(最低1)。
-これは「支払額がフルロード何個分に相当するか」で、上式中の `loads`(= `ceil(kg/7)`、
-料金の上限計算にのみ使う内部値)とは**別物**である点に注意。
-例: 7.5kg は ₱285 なので 1ロード扱い、9.5kg は ₱375 なので 2ロード扱い。
+**load数(per-load課金の単位)= `ceil(kg / 9)`(最低1)。洗濯機1台あたり9kgが上限**。
+料金の階段(7kg)とロード数の階段(9kg)は**わざと別**である点に注意
+(例: 8.5kgは機械1台に収まるので1ロードだが、料金は7kg超過2kg分で ₱330)。
 per-load課金(§5のスピード料金、アドオンのBleach等)はこのload数に掛ける。
+
+| 重量 | ロード数 |
+|---|---|
+| 1–9kg | 1 |
+| 9.1–18kg | 2 |
+| 18.1–27kg | 3 |
+| 27.1–35kg | 4 |
+
+**最低料金 = 1ロード分(₱240)**。7kg未満でも下回らない(例: 3kg = ₱240)。
 
 検証用テストケース(全件が自動テストで検証されている):
 
 | kg | 料金 | ロード数 |
 |---|---|---|
+| 3.0 | ₱240 | 1 |
 | 6.5 | ₱240 | 1 |
 | 7.0 | ₱240 | 1 |
 | 7.5 | ₱285 | 1 |
 | 8.5 | ₱330 | 1 |
+| 9.0 | ₱330 | 1 |
 | 9.5 | ₱375 | 2 |
 | 13.0 | ₱480 | 2 |
 | 13.5 | ₱480 | 2 |
 | 14.5 | ₱525 | 2 |
 | 20.5 | ₱720 | 3 |
 | 27.5 | ₱960 | 4 |
-| 34.5 | ₱1,200 | 5 |
+| 34.5 | ₱1,200 | 4 |
+
+> **注**: 元の価格ガイドは 34.5kg を5ロードとしていたが、スタッフ確認により
+> 「洗濯機は1台9kgまで」が正で、34.5kg は**4ロード**が正しいと訂正された。
 
 入力上限: 36kg。
-
-> **注**: この式では7kg未満でもフルロード料金にならない(例: 5kg = ceil(5)×45 = ₱225、
-> 3kg = ₱135)。「1ロード最低₱240」にしたい場合は式に下限を足す必要がある。
 
 ### §3.2 Blankets / Jeans / Towels(Wash + Dry + Fold)
 
@@ -100,10 +110,10 @@ per-load課金(§5のスピード料金、アドオンのBleach等)はこのload
 ```
 loads     = ceil(weight / 7)
 baseLoads = floor(weight / 7)
-total     = min(baseLoads * base + ceil(weight - baseLoads * 7) * excess_rate, loads * base)
+total     = max(base, min(baseLoads * base + ceil(weight - baseLoads * 7) * excess_rate, loads * base))
 ```
 
-load数 = `round(total / base)`(最低1)。入力上限36kg。
+load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/Dry ₱150・Fold ₱80)。入力上限36kg。
 
 検証用テストケース:
 
@@ -184,9 +194,9 @@ load数 = `round(total / base)`(最低1)。入力上限36kg。
 | superrush | Super Rush (5hrs) | +₱200/load | 当日・§6.1の固定対応表で絞り込み |
 
 - per-load料金は**全行のload数合計**に掛ける。
-  load数: Assorted・Wash Only・Dry Only・Fold Only = `round(行の料金 / base)`(最低1、§3.1・§3.3)、
+  load数: Assorted・Wash Only・Dry Only・Fold Only = `ceil(kg/9)`(最低1、§3.1・§3.3)、
   Blankets = `ceil(kg/5)`(§3.2)、kg/枚数単価サービス = 1。
-  例: Assorted 9.5kg(₱375)= 2ロード → 24 Hours は +₱140。7.5kg(₱285)= 1ロード → +₱70。
+  例: Assorted 9.5kg = 2ロード → 24 Hours は +₱140。8.5kg = 1ロード → +₱70。
 - Standard / 24 Hours のデリバリーは指定日数後の日付から**全スロットを自由選択**(§6の絞り込みなし)。
 - Rush / Super Rush はデリバリー日を**固定しない**(集荷日以降を自由に選択可)。
   - **同日デリバリー**を選んだ場合のみ §6.1 の固定対応表を適用し、該当枠が無ければ Lalamove を自動選択。
