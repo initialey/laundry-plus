@@ -10,12 +10,13 @@
 ## 機能
 
 - **Loads**: サービスと数量(kgまたは枚数)を入れると自動で料金計算
-  - Wash + Dry + Fold: Assorted は12kgブロック方式 — 12kgごとのブロックに分割し、各ブロック=最初の7kgまで240 PHP+超過分45 PHP/kg(切り上げ、ブロック最大465 PHP)。例: 14kg = 465+240 = 705 PHP。Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
-  - per-load料金(スピード・Bleach等)の「load数」はブロック数(Assorted: ceil(kg/12)、Blankets: ceil(kg/5))
+  - Wash + Dry + Fold: Assorted は **7kgロード方式** — **1ロード = 7kg = 240 PHP**、超過分は **+45 PHP/kg**(切り上げ)。ただし**次のフルロード料金を超える場合はフルロード料金**を適用(例: 7.5kg = 285 / 9.5kg = 375 / 13kg = 480)。**最低料金は1ロード分の240 PHP**(3kgでも240)。Blankets・Jeans・Towels 240 PHP/5kgロード(5kg超は自動でロード追加計算)
+  - per-load料金(スピード・Bleach等)の「load数」= **`ceil(kg / 9)`(洗濯機1台9kgまで)**。1–9kg=1 / 9.1–18kg=2 / 18.1–27kg=3 / 27.1–35kg=4。料金の階段(7kg)とロード数の階段(9kg)は別物
+  - **料金はGAS側でも再計算され、シートにはサーバー側の金額が記録される**(クライアント値は信用しない)
   - kg単価サービス(210/kg・155/kg)は開始kgごとに切り上げ(1.5kg → 2kg分)
-  - 詳細仕様: [docs/laundry_plus_order_form_spec.md](docs/laundry_plus_order_form_spec.md)
+  - 詳細仕様・検証済みテストケース一覧: [docs/laundry_plus_order_form_spec.md](docs/laundry_plus_order_form_spec.md)
   - Wash + Dry + Press: 210 PHP/kg(48–72時間仕上げ)
-  - Single Services: Assortedと同じ12kgブロック方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg(各ブロック7kgまでbase、超過は切り上げ/kg、12kgでリセット)
+  - Single Services: Assortedと同じ7kgロード方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
 - **Separate Laundry Preference(洗い分け)**: Whites & Colored(⭐おすすめ・ハイライト表示)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(追加料金はスタッフが受取時に確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
@@ -73,6 +74,8 @@ python3 -m http.server 8787
 `index.html` 内の定数を編集するだけです。
 
 - `LOAD_TYPES` — 品目と料金(base)、込み重量(includedKg)、超過単価(extraPerKg)、ロード単位重量(loadKg)、上限(max)
+  - ⚠️ 料金を変えたら `gas/Code.gs` の `PRICE_LOAD_TYPES` / `PRICE_SPEEDS` / `PRICE_ADDONS` **も同じ値に更新**すること
+    (GASがサーバー側で再計算するため)。ズレると自動テストが落ちるようにしてあります
 - `BANGO` — 香りレベル
 - `SPEEDS` — 仕上がりスピードと追加料金(fee)、仕上がり時間(hours)、ピックアップ締切時刻(cutoff、24h表記)
 - `ADDONS` — アドオン(`per: "load"` はロード数×fee、`per: "order"` は1回限りの固定額)
@@ -114,8 +117,8 @@ payload の形:
   "loads": [{ "type": "assorted", "label": "Assorted Clothes", "qty": 7, "unit": "kg", "amount": 240 }],
   "bango": "normal",
   "separation": "Whites & Colored",
-  "addons": ["Bleach (+₱20/load)"],
-  "prefs": ["Has delicate / hand-wash items"],
+  "addons": ["Bleach (White) (+₱20/load)"],
+  "addonIds": ["bleach"],
   "speed": "24hrs",
   "notes": "",
   "total": 640

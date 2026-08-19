@@ -40,84 +40,88 @@
 
 ## §3 サービスと料金
 
-### §3.1 Assorted Clothes(Wash + Dry + Fold)— 12kgブロック方式
+### §3.1 Assorted Clothes(Wash + Dry + Fold)— 7kgロード方式
 
-重量を**12kgずつのブロック**に分割し、各ブロックを以下で計算して合算する:
-
-- ブロック内の最初の7kgまで: **₱240**
-- 7kgを超えた分: **+₱45/kg**(端数は切り上げ。超過0.1kgでも+₱45)
-- ブロック上限は12kg(ブロック最大額 = 240 + 5 × 45 = **₱465**)
-
-擬似コード:
+**1ロード = 7kg = ₱240**。7kgを超えた分は **+₱45/kg**(端数切り上げ、0.1kg超でも1kg分)。
+ただし**次のフルロード料金を超える場合はフルロード料金を適用**する(超過料金がロード料金より
+高くつくことはない)。
 
 ```
-total = 0; remaining = kg
-while remaining > 0:
-    block = min(remaining, 12)
-    total += 240 + max(0, ceil(block - 7)) * 45
-    remaining -= block
+loads      = ceil(weight / 7)          # 料金の上限計算にのみ使う内部値
+baseLoads  = floor(weight / 7)
+basePrice  = baseLoads * 240
+excessKg   = ceil(weight - baseLoads * 7)
+excessPrice= excessKg * 45
+total      = max(240, min(basePrice + excessPrice, loads * 240))   # 最低₱240
 ```
 
-「load数」は**ブロック数**と同義(= `ceil(kg / 12)`)。per-load課金(§5のスピード料金、
-アドオンのBleach/Extra Detergent)はこのload数に掛ける。
+**load数(per-load課金の単位)= `ceil(kg / 9)`(最低1)。洗濯機1台あたり9kgが上限**。
+料金の階段(7kg)とロード数の階段(9kg)は**わざと別**である点に注意
+(例: 8.5kgは機械1台に収まるので1ロードだが、料金は7kg超過2kg分で ₱330)。
+per-load課金(§5のスピード料金、アドオンのBleach等)はこのload数に掛ける。
 
-検証用テストケース:
+| 重量 | ロード数 |
+|---|---|
+| 1–9kg | 1 |
+| 9.1–18kg | 2 |
+| 18.1–27kg | 3 |
+| 27.1–35kg | 4 |
 
-| kg | 概算 | 内訳 |
+**最低料金 = 1ロード分(₱240)**。7kg未満でも下回らない(例: 3kg = ₱240)。
+
+検証用テストケース(全件が自動テストで検証されている):
+
+| kg | 料金 | ロード数 |
 |---|---|---|
-| 5 | ₱240 | 1ブロック |
-| 7 | ₱240 | 1ブロック |
-| 7.1 | ₱285 | 240 + 45 |
-| 8 | ₱285 | 240 + 45 |
-| 12 | ₱465 | 240 + 5×45 |
-| 12.1 | ₱705 | 465 + 240 |
-| 13 | ₱705 | 465 + 240 |
-| 14 | ₱705 | 465 + 240 |
-| 19 | ₱705 | 465 + 240 |
-| 20 | ₱750 | 465 + 285 |
-| 24 | ₱930 | 465 + 465 |
-| 24.1 | ₱1,170 | 465 + 465 + 240 |
+| 3.0 | ₱240 | 1 |
+| 6.5 | ₱240 | 1 |
+| 7.0 | ₱240 | 1 |
+| 7.5 | ₱285 | 1 |
+| 8.5 | ₱330 | 1 |
+| 9.0 | ₱330 | 1 |
+| 9.5 | ₱375 | 2 |
+| 13.0 | ₱480 | 2 |
+| 13.5 | ₱480 | 2 |
+| 14.5 | ₱525 | 2 |
+| 20.5 | ₱720 | 3 |
+| 27.5 | ₱960 | 4 |
+| 34.5 | ₱1,200 | 4 |
 
-入力上限: 36kg(3ブロック)。
+> **注**: 元の価格ガイドは 34.5kg を5ロードとしていたが、スタッフ確認により
+> 「洗濯機は1台9kgまで」が正で、34.5kg は**4ロード**が正しいと訂正された。
+
+入力上限: 36kg。
 
 ### §3.2 Blankets / Jeans / Towels(Wash + Dry + Fold)
 
 - **₱240 / 5kgロード**。5kgを超えるごとに新しいロード(= `ceil(kg / 5) × 240`)。
 - 例: 6kg = 2ロード = ₱480、12kg = 3ロード = ₱720。load数 = `ceil(kg / 5)`。
 
-### §3.3 Single Services — 12kgブロック方式(§3.1と同一構造)
+### §3.3 Single Services — 7kgロード方式(§3.1と同一構造)
 
-§3.1と同じ12kgブロックリセット方式で、base / excess_rate のみサービスごとに異なる:
+§3.1と同じ式で、base / excess_rate のみサービスごとに異なる:
 
-| サービス | base(7kgまで) | excess_rate(超過/kg・切り上げ) | ブロック上限額 |
-|---|---|---|---|
-| Wash Only | ₱150 | +₱30/kg | ₱300 |
-| Dry Only | ₱150 | +₱30/kg | ₱300 |
-| Fold Only | ₱80 | +₱15/kg | ₱155 |
+| サービス | base(7kgまで) | excess_rate(超過/kg・切り上げ) |
+|---|---|---|
+| Wash Only | ₱150 | +₱30/kg |
+| Dry Only | ₱150 | +₱30/kg |
+| Fold Only | ₱80 | +₱15/kg |
 
 ```
-total = 0; remaining = kg
-while remaining > 0:
-    block = min(remaining, 12)
-    total += base + max(0, ceil(block - 7)) * excess_rate
-    remaining -= block
+loads     = ceil(weight / 7)
+baseLoads = floor(weight / 7)
+total     = max(base, min(baseLoads * base + ceil(weight - baseLoads * 7) * excess_rate, loads * base))
 ```
 
-load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入力上限36kg。
+load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/Dry ₱150・Fold ₱80)。入力上限36kg。
 
 検証用テストケース:
 
 | kg | Wash/Dry Only | Fold Only |
 |---|---|---|
-| 5 | ₱150 | ₱80 |
 | 7 | ₱150 | ₱80 |
-| 7.1 | ₱180 | ₱95 |
-| 12 | ₱300 | ₱155 |
-| 12.1 | ₱450 | ₱235 |
-| 19 | ₱450 | ₱235 |
-| 20 | ₱480 | ₱250 |
-| 24 | ₱600 | ₱310 |
-| 24.1 | ₱750 | ₱390 |
+| 7.5 | ₱180 | ₱95 |
+| 13 | ₱300(2ロードで頭打ち) | ₱160(同) |
 
 ### §3.4 Wash + Dry + Press / Press Only
 
@@ -189,10 +193,10 @@ load数 = ブロック数 = `ceil(kg / 12)`(§5のper-load課金に連動)。入
 | rush | Rush (Same Day) | +₱150/load | 当日・§6.1の固定対応表で絞り込み |
 | superrush | Super Rush (5hrs) | +₱200/load | 当日・§6.1の固定対応表で絞り込み |
 
-- per-load料金の**「load数」はブロック数と同義**。全行のload数合計に料金を掛ける。
-  load数: Assorted・Wash Only・Dry Only・Fold Only = `ceil(kg/12)`(§3.1・§3.3)、
+- per-load料金は**全行のload数合計**に掛ける。
+  load数: Assorted・Wash Only・Dry Only・Fold Only = `ceil(kg/9)`(最低1、§3.1・§3.3)、
   Blankets = `ceil(kg/5)`(§3.2)、kg/枚数単価サービス = 1。
-  例: Assorted 14kg = 2ブロック → 24 Hours は +₱140。Wash Only 14kg = 2ブロック → +₱140。
+  例: Assorted 9.5kg = 2ロード → 24 Hours は +₱140。8.5kg = 1ロード → +₱70。
 - Standard / 24 Hours のデリバリーは指定日数後の日付から**全スロットを自由選択**(§6の絞り込みなし)。
 - Rush / Super Rush はデリバリー日を**固定しない**(集荷日以降を自由に選択可)。
   - **同日デリバリー**を選んだ場合のみ §6.1 の固定対応表を適用し、該当枠が無ければ Lalamove を自動選択。
@@ -277,7 +281,15 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 ## §8 データ連携(GAS)
 
 - 注文POST → 「Orders」シートに記録(Status列でNEW→WASHING→READY→PICKED UP/CANCELLEDを管理)+Telegram通知。
-- **料金計算はフォーム(index.html)側のみ**で行い、GASは `total` を記録するだけ(計算ロジックの二重管理をしない)。
+- **料金はGAS側で再計算する(サーバーが正)**。フォームはリアルタイム見積もりを表示するが、
+  シートに記録されるのは `recomputeGross()` が明細から再導出した金額であり、クライアントの
+  `total` は信用しない。`gas/Code.gs` の `PRICE_LOAD_TYPES` / `PRICE_SPEEDS` / `PRICE_ADDONS` は
+  `index.html` の `LOAD_TYPES` / `SPEEDS` / `ADDONS` の写しで、**両者が一致することを自動テストで検証**している
+  (片方だけ変更すると即座にテストが落ちる)。
+  - 再計算には明細の `type` id が必要。アドオンは表示文字列に加えて `addonIds` を送信する。
+  - 未知の `type` / `speed` / アドオンidを含むなど**再導出できないpayloadはクライアント値にフォールバック**する
+    (0円で記録して取りこぼすより安全側に倒す)。ログに警告を残す。
+  - 割引もサーバー側grossから再計算し、**プロモコード無しで `discount` だけ申告された場合は無視**する。
 - `GET ?action=slots&date=` … スロット空き状況(公開)/ `GET ?action=day&date=&key=` … 管理画面用の予約一覧(要ADMIN_KEY)/ `POST {action:"block"}` … スロットのBLOCK/UNBLOCK。
 - `GET ?action=promo&code=` … プロモコード検証(公開)/ `GET ?action=promos&key=` … コード一覧(要ADMIN_KEY)/ `POST {action:"promo", op:"save"|"toggle"|"delete"}` … コード管理。PromoCodesシートに保存。
 - `GET ?action=riders&date=&key=` … その日のライダー人数・スロット上限・手動上書き値取得(要ADMIN_KEY、`capOverride` を含む)/

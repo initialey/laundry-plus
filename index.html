@@ -314,7 +314,17 @@ select {
   text-align: right;
   color: var(--sky-deep);
   white-space: nowrap;
+  line-height: 1.25;
 }
+.load .amt .u {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6aa9c9;
+}
+.loadcount { font-weight: 800; color: var(--sky-deep); }
 .load .del {
   width: 30px; height: 30px;
   border: 0;
@@ -748,11 +758,11 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
 
   <div class="pricebar">
     <div class="prow main">
-      <div class="pl">Assorted Clothes<br>Up to 7kg</div>
+      <div class="pl">Assorted Clothes<br><small>₱240 per load (up to 7kg)</small></div>
       <div class="pr"><span class="num">240</span><span class="per">PHP</span></div>
     </div>
     <div class="prow">
-      <div class="pl">↳ Additional Weight</div>
+      <div class="pl">↳ <small>+₱45 per additional kg</small></div>
       <div class="pr"><span class="num sm">45</span><span class="per">PHP/Kg</span></div>
     </div>
     <div class="prow">
@@ -826,6 +836,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="loads" id="loads"></div>
       <button type="button" class="add-load" id="addLoad">+ Add another load</button>
       <p class="hint">Pick a service, then enter the weight (kg) or number of pieces (pc). Wash + Dry + Press is ready in 48–72 hrs.</p>
+      <p class="hint"><b>₱240 per load (up to 7kg)</b> · <b>+₱45 per additional kg</b> — whichever is cheaper: extra kilos are never charged above the price of the next full load.</p>
     </section>
 
     <section class="card">
@@ -892,12 +903,12 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
         </div>
         <p class="promomsg" id="promoMsg"></p>
       </div>
-      <div class="line"><span>Loads subtotal</span><span id="subLoads">₱0</span></div>
+      <div class="line"><span>Loads subtotal <small class="loadcount" id="loadCount"></small></span><span id="subLoads">₱0</span></div>
       <div class="line"><span>Speed surcharge</span><span id="subSpeed">₱0</span></div>
       <div class="line"><span>Add-ons</span><span id="subAddons">₱0</span></div>
       <div class="line promoline" id="promoLine" style="display:none"><span id="promoLabel">Promo</span><span id="subDiscount">−₱0</span></div>
       <div class="grand">
-        <span class="t">TOTAL</span>
+        <span class="t">ESTIMATED PRICE</span>
         <span class="v"><small>₱</small><span id="grandTotal">0</span></span>
       </div>
       <div class="estnote">⚠️ All prices shown are <b>estimates only</b>. Your final price is determined at the shop after your laundry arrives and is weighed.</div>
@@ -993,12 +1004,12 @@ updateCityLogic(); // sync initial state (no-op while City is still blank)
 // ===== Pricing master (sync with GAS sheet later) =====
 // model "load": flat per load (+extraPerKg above includedKg) / model "rate": price × qty
 const LOAD_TYPES = [
-  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 up to 7kg +₱45/kg" },
+  { group: "Wash + Dry + Fold",  id: "assorted",    label: "Assorted Clothes",                  model: "load", base: 240, includedKg: 7, extraPerKg: 45, loadCapKg: 9, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱240 per load (up to 7kg) · +₱45/kg" },
   { group: "Wash + Dry + Fold",  id: "blankets",    label: "Blankets / Jeans / Towels",         model: "load", base: 240, loadKg: 5, unit: "kg", step: 0.5, max: 20, def: 5, tag: "₱240 max 5kg/load" },
   { group: "Wash + Dry + Press", id: "wdpress",     label: "Wash + Dry + Press",                model: "rate", rate: 210, unit: "kg", step: 0.5, max: 20, def: 3, tag: "₱210/kg · 48–72 hrs" },
-  { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg" },
-  { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, includedKg: 7, extraPerKg: 30, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 up to 7kg +₱30/kg" },
-  { group: "Single Services",    id: "foldonly",    label: "Fold Only",                         model: "load", base: 80,  includedKg: 7, extraPerKg: 15, blockKg: 12, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱80 up to 7kg +₱15/kg" },
+  { group: "Single Services",    id: "washonly",    label: "Wash Only",                         model: "load", base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 per load (up to 7kg) · +₱30/kg" },
+  { group: "Single Services",    id: "dryonly",     label: "Dry Only",                          model: "load", base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱150 per load (up to 7kg) · +₱30/kg" },
+  { group: "Single Services",    id: "foldonly",    label: "Fold Only",                         model: "load", base: 80,  includedKg: 7, extraPerKg: 15, loadCapKg: 9, unit: "kg", step: 0.5, max: 36, def: 7, tag: "₱80 per load (up to 7kg) · +₱15/kg" },
   { group: "Press Only",         id: "presskg",     label: "Press Only (per kg)",               model: "rate", rate: 155, unit: "kg", step: 0.5, max: 20, def: 1, tag: "₱155/kg, no min" },
   { group: "Press Only",         id: "tops",        label: "Tops (Shirt, Polo, Long Sleeves)",  model: "rate", rate: 40,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱40/pc" },
   { group: "Press Only",         id: "bottoms",     label: "Bottoms (Pants, Trousers, Shorts)", model: "rate", rate: 55,  unit: "pc", step: 1, max: 50, def: 1, tag: "₱55/pc" },
@@ -1140,30 +1151,33 @@ loadsEl.addEventListener("click", e => {
 document.getElementById("addLoad").addEventListener("click", () => addLoadRow());
 document.getElementById("speeds").addEventListener("change", updateTotals);
 
+// ₱base per full load (up to includedKg), then +extraPerKg per *started*
+// excess kg — but never more than simply paying for the next full load.
+// e.g. 7kg=₱240, 7.5kg=₱285, 13kg=₱480 (capped, since 240+6×45=510 > 2×240).
+// Kept in sync with loadPriceFor() in gas/Code.gs, which re-derives the
+// total server-side and is the authoritative figure.
 function loadPrice(t, qty) {
-  // per-kg rates charge every started kg (same ceil rule as assorted excess)
+  // per-kg rates charge every started kg (same ceil rule as the excess below)
   if (t.model === "rate") return t.unit === "kg" ? t.rate * Math.ceil(qty) : Math.round(t.rate * qty);
-  // 12kg-block reset (Assorted & single services): each block = base for the
-  // first includedKg, then +extraPerKg per started kg of excess
-  if (t.blockKg) {
-    let total = 0, remaining = qty;
-    while (remaining > 0) {
-      const block = Math.min(remaining, t.blockKg);
-      total += t.base + Math.max(0, Math.ceil(block - t.includedKg)) * t.extraPerKg;
-      remaining -= block;
-    }
-    return total;
-  }
   // every started block of loadKg counts as another full load (e.g. towels: 6kg = 2 loads)
   if (t.loadKg) return t.base * Math.ceil(qty / t.loadKg);
-  let price = t.base;
-  if (t.extraPerKg && qty > t.includedKg) price += Math.ceil(qty - t.includedKg) * t.extraPerKg;
-  return price;
+  if (t.extraPerKg) {
+    const baseLoads = Math.floor(qty / t.includedKg);
+    // 1e-9 absorbs float dust so an exact multiple (14 / 7) doesn't bill 1 excess kg
+    const excessKg = Math.max(0, Math.ceil(qty - baseLoads * t.includedKg - 1e-9));
+    const capLoads = Math.ceil(qty / t.includedKg - 1e-9);
+    const price = Math.min(baseLoads * t.base + excessKg * t.extraPerKg, capLoads * t.base);
+    return Math.max(t.base, price); // one full load is the minimum charge
+  }
+  return t.base;
 }
-// how many machine loads a row occupies — per-load fees (speed, add-ons) scale by this
+// How many machine loads a row occupies — per-load fees (speed, add-ons)
+// scale by this. Capacity is loadCapKg (9kg for the washers), which is
+// deliberately NOT the 7kg pricing tier: 8.5kg is one machine load but is
+// priced at ₱240 + 2 excess kg.
 function loadUnitsOf(t, qty) {
-  if (t.blockKg) return Math.ceil(qty / t.blockKg);
   if (t.loadKg) return Math.ceil(qty / t.loadKg);
+  if (t.loadCapKg) return Math.max(1, Math.ceil(qty / t.loadCapKg - 1e-9));
   return 1;
 }
 function collectLoads() {
@@ -1200,8 +1214,12 @@ function computeTotals() {
 function updateTotals() {
   const { loads, subLoads, subSpeed, subAddons, discount, total } = computeTotals();
   [...loadsEl.querySelectorAll(".load")].forEach((row, i) => {
-    row.querySelector(".amt").textContent = php(loads[i].amount);
+    const u = loads[i].units;
+    row.querySelector(".amt").innerHTML =
+      `${php(loads[i].amount)}<span class="u">${u} load${u === 1 ? "" : "s"}</span>`;
   });
+  const totalUnits = loads.reduce((s, l) => s + l.units, 0);
+  document.getElementById("loadCount").textContent = `(${totalUnits} load${totalUnits === 1 ? "" : "s"})`;
   document.getElementById("subLoads").textContent = php(subLoads);
   document.getElementById("subSpeed").textContent = php(subSpeed);
   document.getElementById("subAddons").textContent = php(subAddons);
@@ -1494,8 +1512,9 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
 
   const speed = document.querySelector("input[name=speed]:checked");
   const { loads, discount, total } = computeTotals();
-  const addons = [...document.querySelectorAll("input[name=addon]:checked")].map(el => {
-    const a = ADDONS.find(x => x.id === el.value);
+  const addonIds = [...document.querySelectorAll("input[name=addon]:checked")].map(el => el.value);
+  const addons = addonIds.map(id => {
+    const a = ADDONS.find(x => x.id === id);
     return `${a.label} (+₱${a.fee}${a.per === "load" ? "/load" : ""})`;
   });
   const payload = {
@@ -1519,6 +1538,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
       return s === "Per Bag" ? `Per Bag × ${parseInt(bagCount.value, 10)} bags` : s;
     })(),
     addons,
+    addonIds, // machine-readable companion to `addons`, for the GAS re-price
     speed: speed.value,
     notes: form.notes.value.trim(),
     tncAgreedAt: new Date().toISOString(),

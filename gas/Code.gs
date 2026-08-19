@@ -92,6 +92,101 @@ const RIDER_ROSTER_HEADERS = ["Rider ID", "Name", "Telegram Chat ID", "Base Addr
 const RIDER_SCHEDULE_SHEET = "RiderSchedule";
 const RIDER_SCHEDULE_HEADERS = ["Date", "Rider ID", "Rider Name", "On Duty", "Registered At"];
 
+// ===== Pricing (server-side authority) =====
+// Mirror of LOAD_TYPES / SPEEDS / ADDONS in index.html. The form shows a
+// live estimate, but the figure written to the sheet is the one re-derived
+// here, so a stale or tampered client can't set its own price.
+// KEEP IN SYNC with index.html — the shapes are deliberately identical.
+const PRICE_LOAD_TYPES = {
+  assorted: { base: 240, includedKg: 7, extraPerKg: 45, loadCapKg: 9 },
+  blankets: { base: 240, loadKg: 5 },
+  wdpress:  { rate: 210, perKg: true },
+  washonly: { base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9 },
+  dryonly:  { base: 150, includedKg: 7, extraPerKg: 30, loadCapKg: 9 },
+  foldonly: { base: 80,  includedKg: 7, extraPerKg: 15, loadCapKg: 9 },
+  presskg:     { rate: 155, perKg: true },
+  tops:        { rate: 40 },
+  bottoms:     { rate: 55 },
+  simpledress: { rate: 80 },
+  longdress:   { rate: 105 },
+  jacket:      { rate: 105 },
+  hanger:      { rate: 20 },
+};
+const PRICE_SPEEDS = { standard: 0, "24hrs": 70, rush: 150, superrush: 200 };
+const PRICE_ADDONS = {
+  bleach:          { fee: 20,  per: "load" },
+  colorsafebleach: { fee: 20,  per: "load" },
+  detergent:       { fee: 10,  per: "load" },
+  fabcon:          { fee: 10,  per: "load" },
+  extrarinse:      { fee: 50,  per: "load" },
+  bag:             { fee: 200, per: "order" },
+};
+
+// ₱base per full load (up to includedKg), then +extraPerKg per *started*
+// excess kg, never above the price of the next full load, and never below
+// one full load (the minimum charge).
+// 7kg=₱240, 7.5kg=₱285, 13kg=₱480 (240+6×45=510 would exceed 2×240), 3kg=₱240.
+function loadPriceFor(t, qty) {
+  if (t.rate) return t.perKg ? t.rate * Math.ceil(qty) : Math.round(t.rate * qty);
+  if (t.loadKg) return t.base * Math.ceil(qty / t.loadKg);
+  if (t.extraPerKg) {
+    const baseLoads = Math.floor(qty / t.includedKg);
+    // 1e-9 absorbs float dust so an exact multiple (14 / 7) doesn't bill 1 excess kg
+    const excessKg = Math.max(0, Math.ceil(qty - baseLoads * t.includedKg - 1e-9));
+    const capLoads = Math.ceil(qty / t.includedKg - 1e-9);
+    const price = Math.min(baseLoads * t.base + excessKg * t.extraPerKg, capLoads * t.base);
+    return Math.max(t.base, price); // one full load is the minimum charge
+  }
+  return t.base;
+}
+
+// Machine loads a row occupies — per-load fees scale by this. Capacity is
+// loadCapKg (9kg), deliberately NOT the 7kg pricing tier.
+function loadUnitsFor(t, qty) {
+  if (t.loadKg) return Math.ceil(qty / t.loadKg);
+  if (t.loadCapKg) return Math.max(1, Math.ceil(qty / t.loadCapKg - 1e-9));
+  return 1;
+}
+
+// Re-derives the pre-discount total from the submitted line items.
+// Returns null when the payload can't be fully accounted for (unknown load
+// type / speed, or a legacy payload with no per-load type ids) — the caller
+// then keeps the client's figure rather than risking an under-charge.
+function recomputeGross(data) {
+  const rows = data.loads || [];
+  if (!rows.length) return null;
+
+  let subLoads = 0, units = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const t = PRICE_LOAD_TYPES[rows[i].type];
+    const qty = Number(rows[i].qty);
+    if (!t || !(qty > 0)) return null;
+    subLoads += loadPriceFor(t, qty);
+    units += loadUnitsFor(t, qty);
+  }
+
+  const speedFee = PRICE_SPEEDS[data.speed];
+  if (speedFee === undefined) return null;
+  const subSpeed = speedFee * units;
+
+  // addonIds is the machine-readable companion to the display strings in
+  // `addons`; without it we can't price add-ons and must not guess.
+  let subAddons = 0;
+  if (data.addonIds) {
+    if (!Array.isArray(data.addonIds)) return null;
+    for (let j = 0; j < data.addonIds.length; j++) {
+      const a = PRICE_ADDONS[data.addonIds[j]];
+      if (!a) return null;
+      subAddons += a.per === "load" ? a.fee * units : a.fee;
+    }
+  } else if ((data.addons || []).length) {
+    return null; // add-ons were chosen but we have no ids to price them by
+  }
+
+  return { subLoads: subLoads, subSpeed: subSpeed, subAddons: subAddons, units: units,
+           gross: subLoads + subSpeed + subAddons };
+}
+
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   if (data.action === "block") return handleBlock(data); // from admin.html
@@ -114,24 +209,48 @@ function doPost(e) {
     .join("\n");
   const addonsText = (data.addons || []).join("\n");
 
+  // Re-derive the pre-discount total from the line items — the client's own
+  // figure is only a fallback for payloads we can't fully account for.
+  let gross = Number(data.total) || 0;
+  let discount = Number(data.discount) || 0;
+  gross = gross + discount; // client `total` is post-discount; work from gross
+  let recomputed = null;
+  try {
+    recomputed = recomputeGross(data);
+  } catch (err) {
+    console.error("recomputeGross failed: " + err);
+  }
+  if (recomputed) {
+    if (recomputed.gross !== gross) {
+      console.warn("Client gross P" + gross + " != server P" + recomputed.gross
+        + " for " + data.receiptNo + " — using the server figure.");
+    }
+    gross = recomputed.gross;
+  } else {
+    console.warn("Could not re-derive a total for " + data.receiptNo + "; keeping the client figure.");
+  }
+
   // Re-validate the promo server-side (authoritative). If it no longer holds
   // — used up, already used by this customer, expired — drop the discount so
   // it can't be reused. The customer's own order isn't in the sheet yet, so
   // customerUsedPromo won't self-match.
   let promoCode = data.promoCode || "";
-  let discount = Number(data.discount) || 0;
-  let total = Number(data.total) || 0;
   let promoOk = false;
   if (promoCode) {
     const v = validatePromo(promoCode, data.phone, data.email);
     if (v.ok) {
       promoOk = true;
+      // recompute the discount off the server gross, same rule as the form
+      discount = v.type === "fixed" ? Number(v.value) : Math.round(gross * Number(v.value) / 100);
+      discount = Math.min(discount, gross);
     } else {
-      total = total + discount; // restore the (now unavailable) discount
       discount = 0;
       promoCode = "";
     }
+  } else {
+    discount = 0; // no code ⇒ no discount, whatever the client claimed
   }
+  const total = gross - discount;
 
   // Auto-assign the nearest on-duty rider — best-effort, computed BEFORE the
   // row is appended so the result lands in the same write (no second pass).
