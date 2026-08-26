@@ -134,8 +134,12 @@ load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/
 ## §4 Bango / Separate Laundry Preference / Add-ons
 
 - **Bango Level**(香り): None / Less / Normal(デフォルト・推奨)/ Extra / Ultra
-- **Separate Laundry Preference**(洗い分け): Whites & Colored / Beddings & Clothes /
-  Beddings & Towels / Per Bag / Mixed(デフォルト・無料)。Mixed以外は Additional Charge 表示。
+- **Separate Laundry Preference**(洗い分け): **複数選択可(チェックボックス)。選択なしも許容**(必須ではない)。
+  選択肢: Whites & Colored / Beddings & Clothes / Beddings & Towels / Per Bag / Mixed。
+  - 選択した項目は**カンマ区切り**で Ordersシートの Separation 列・Telegram通知に記録
+  - **各項目の `fee` を合算して合計に反映**する。ただし現状は全項目 `fee: 0`(洗い分けの追加料金は
+    これまで金額が定義されておらず「スタッフが受取時に確認」の運用のため)。`SEPARATION` 配列に
+    金額を入れれば自動的に合算され、合計欄に「Separation」行が出る
   - Whites & Colored は「⭐ (Our Recommendation)」表記+カードを黄色系にハイライト(おすすめ)
   - Mixed の補足: "Assorted loads may include UP TO 2KG of towels, jeans, or bedding."
   - セクション下部の注記: "Any additional fees will be confirmed by our staff upon receiving your laundry."
@@ -188,10 +192,10 @@ load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/
 
 | ID | 表示 | 追加料金 | デリバリー |
 |---|---|---|---|
-| standard | Standard | 無料 | 集荷の2日後以降(自由選択) |
-| 24hrs | 24 Hours | **+₱70/load** | 集荷の翌日以降(自由選択) |
-| rush | Rush (Same Day) | +₱150/load | 当日・§6.1の固定対応表で絞り込み |
-| superrush | Super Rush (5hrs) | +₱200/load | 当日・§6.1の固定対応表で絞り込み |
+| standard | Standard | 無料 | 集荷の2日後以降(時間下限なし) |
+| 24hrs | 24 Hours | **+₱70/load** | 集荷の翌日以降 **かつ 集荷日時+24時間以降** |
+| rush | Rush (Same Day) | +₱150/load | 集荷日以降 **かつ 集荷日時+8時間以降** |
+| superrush | Super Rush (5hrs) | +₱200/load | 集荷日以降 **かつ 集荷日時+5時間以降** |
 
 - per-load料金は**全行のload数合計**に掛ける。
   load数: Assorted・Wash Only・Dry Only・Fold Only = `ceil(kg/9)`(最低1、§3.1・§3.3)、
@@ -217,53 +221,71 @@ load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/
   - 各曜日の最終スロットはライダーの稼働終了時刻に近いため、意図的に **⚠️ (Limited) バッジ**を
     フォーム・管理画面の両方に表示する(選択・予約自体は可能)。
 - 当日スロットは現在時刻+1時間以降のみ表示。
-- **スロット上限 = その日のライダー人数 × 4**(各ライダーが1枠につき4件対応)。
-  **1人=4件/枠 / 2人=8件/枠**、デフォルト **2人=8件/枠**。
+- **スロット上限 = そのスロットのライダー人数 × 4**(各ライダーが1枠につき4件対応)。
+  **タイムスロットごとに個別設定**でき、デフォルトは以下:
+
+  | タイムスロット | ライダー数 | 上限枠 |
+  |---|---|---|
+  | 8:00–9:00 / 9:00–10:30 / 7:00–8:30 PM / 8:30–9:00 PM | 1 | 4 |
+  | 上記以外 | 2 | 8 |
+
+  保存先は **`SlotRiders` シート**(Date / Time Slot / Riders / Capacity / Updated At)。
+  設定が無い日付・スロットは上記デフォルトにフォールバックする。
+  > **注**: 指示票では `RiderSchedule` シートに保存するとあったが、同シートは
+  > **ライダーの日次出勤(誰が出勤か)**を保持しており自動アサイン機能が使用中のため、
+  > 構造を変えると既存データが壊れる。per-slot容量は別シート `SlotRiders` に分離した。
+
+  優先順位: ①該当(日付, スロット)のライダー数設定 → ②日単位の Slot Capacity Override →
+  ③スロット既定のライダー数 × 4。
+  (①が入ったことで、従来の「日単位のライダー人数」は容量計算に使われなくなった —
+  全スロットに一律適用されてしまうのが今回直した問題そのもののため)
   ライダー人数を変えるとその日の全スロット上限が連動。GASの **Riders シート**
   (Date / Count / Updated At)に日付ごとの人数と更新日時を保存し、未設定の日は DEFAULT_RIDERS(=2)。
   予約数(集荷+配達、CANCELLED除外)が `人数×4` 以上、または管理画面でBLOCKされたスロットは「FULL」表示で選択不可。
 - ライダー人数は **admin.html の Rider Management パネル**で日付ごとに設定(1/2)。フォームは
   `?action=slots` の `cap`(= 人数×4、または下記の手動上書き値)を読むだけなので、変更に自動追従(フォーム側の改修不要)。
-- **Slot Capacity Override**: 上記の自動計算(人数×4)を日付ごとに手動で上書きできる
-  (admin.html の Rider Management パネル内)。`Riders` シートの4列目(Capacity Override)に保存され、
-  設定があればライダー人数に関わらずその値がそのままスロット上限になる。未設定の日は従来通り人数×4。
+- **Slot Capacity Override**: 日単位で全スロットの上限を手動で上書きできる
+  (admin.html の Rider Management パネル内)。`Riders` シートの4列目(Capacity Override)に保存。
+  per-slotのライダー数設定があるスロットではそちらが優先される。
 
-### §6.1 Rush / Super Rush 配達枠 固定対応表(ルックアップ)
+### §6.1 デリバリー時刻の下限(仕上がり時間ルール)
 
-集荷スロット → 選択可能な**同日**配達枠(§5の通り、同日デリバリーを選んだ場合のみ適用)。
-該当枠が無い集荷スロットは「当日配達枠なし」→ **Lalamove(customer arranges/pays separately)** 案内に切替
-(自動手配はしない・案内のみ)。
+旧「固定対応表」は廃止。**集荷日時 + そのスピードの所要時間**を下限とし、それ以降に始まるスロットのみ選択可能。
 
-対応表の配達枠はその日の実在スロットと積集合を取る(週末に無い 7:00–8:30 PM / 8:30–9:00 PM は自動除外)。
-
-**RUSH(8〜10時間仕上げ)**
-
-| 集荷スロット | 選択可能な同日配達枠 |
+| スピード | 下限 |
 |---|---|
-| 8:00–9:00 AM | 5:00–6:30 PM / 7:00–8:30 PM / 8:30–9:00 PM |
-| 9:00–10:30 AM | 7:00–8:30 PM / 8:30–9:00 PM |
-| 11:00–12:30 PM | 8:30–9:00 PM のみ |
-| 1:00–2:30 PM 以降 | なし → Lalamove |
+| Super Rush | 集荷日時 + **5時間** |
+| Rush | 集荷日時 + **8時間**(自称の仕上がり「8–10 hrs」に合わせる) |
+| 24 Hours | 集荷日時 + **24時間** |
+| Standard | 時間下限なし(従来の「集荷2日後以降」の日数ルールのみ) |
 
-**SUPER RUSH(5時間〜仕上げ)**
+例:
+- 24 Hours・集荷 8/25 13:00 → **8/26 13:00 以降**のみ(8/26 09:00 は不可 ← 報告された不具合)
+- Rush・集荷 8/25 13:00 → 8/25 21:00 以降
+- Super Rush・集荷 8/25 13:00 → **8/25 18:00 以降**
 
-| 集荷スロット | 選択可能な同日配達枠 |
-|---|---|
-| 8:00–9:00 AM | 1:00–2:30 PM / 3:00–4:30 PM / 5:00–6:30 PM / 7:00–8:30 PM / 8:30–9:00 PM |
-| 9:00–10:30 AM | 3:00–4:30 PM / 5:00–6:30 PM / 7:00–8:30 PM / 8:30–9:00 PM |
-| 11:00–12:30 PM | 5:00–6:30 PM / 7:00–8:30 PM / 8:30–9:00 PM |
-| 1:00–2:30 PM | 7:00–8:30 PM / 8:30–9:00 PM |
-| 3:00–4:30 PM | 8:30–9:00 PM のみ |
-| 5:00–6:30 PM 以降 | なし → Lalamove |
+実装:
+- 条件を満たさないスロットは **`disabled`(グレーアウト)** で「— too soon」を付けて表示。非表示にはしない
+- 集荷日時を変更するとデリバリースロットを**リアルタイムで再計算**し、条件を外れた選択は自動で解除
+- Rush / Super Rush で**同日**を選び、その日に条件を満たす枠が1つも無い場合は
+  **Lalamove(customer arranges/pays separately)** に自動切替(案内のみ・自動手配はしない)
+- **GAS側でも `deliveryWindowError()` で同じ検証**を行い、条件違反のpayloadは
+  `{ok:false, reload:true}` を返して**記録しない**(古いタブ・改竄対策)。
+  Lalamove配達や解析できない日時は対象外
 
-Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arranged)` として記録。
+> **注**: 指示票では「Rush(24時間)」と書かれていたが、本アプリの `rush` は「Same Day (8–10 hrs)」で
+> あり、24時間は別スピード `24hrs` である。`rush` に24時間を適用すると同日配達が成立しなくなるため、
+> **24時間は `24hrs` に、`rush` には自身の仕上がり時間である8時間**を適用した。
 
 ### §6.2 スロットの手動 +1 / −1 調整
 
 フォーム外で受けた予約(電話・店頭・LINE等)も枠を消費させるための仕組み。
 
-- admin.html のスケジュール一覧で、各日付・各タイムスロットに **+1 / −1** ボタンを表示。
-  カウント表示は「使用数 / 上限数」(例: `3 / 8`)で、手動調整分を含んだ数値。
+- admin.html のスケジュール一覧で、各日付・各タイムスロットに **+1 / −1 ボタン**と
+  **数値入力欄**を表示。カウント表示は「使用数 / 上限数」(例: `3 / 8`)で、手動調整分を含んだ数値。
+- **数値入力欄**にはそのスロットの**合計予約数**を直接入力する(0以上・そのスロットの上限以下)。
+  保存時は「入力値 − フォーム経由の実予約数」を調整値として `SlotAdjustments` に記録する。
+  実予約数を下回る値は拒否(実予約はステータス変更でしか減らせないため)。
 - **調整値は「追加の予約数」としてカウントする**:
   **実質空き = 上限 − フォーム予約数 − 手動調整数**
   つまり **+1 = 枠を1つ消費**(手動予約を入れた)、**−1 = 枠を1つ戻す**(その手動予約を取り消した)。
@@ -280,7 +302,13 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 
 ## §8 データ連携(GAS)
 
-- 注文POST → 「Orders」シートに記録(Status列でNEW→WASHING→READY→PICKED UP/CANCELLEDを管理)+Telegram通知。
+- 注文POST → 「Orders」シートに記録(Status列)+Telegram通知。
+- **ステータスは4種に統一**: `NEW`(新規注文時のデフォルト)→ `ENCODED` → `PICKED UP` → `DELIVERED`。
+  admin.htmlのドロップダウンとSheetsのデータ入力規則(ドロップダウン)を同じ4種に設定する。
+  データ入力規則は `allowInvalid: true` — 旧値(WASHING / READY / CANCELLED)が残っている
+  既存行を弾いたりフラグを立てたりしないため。**既存の注文データのStatus値は書き換えない**。
+  > **注**: 4種に統一した結果 `CANCELLED` が選べなくなった。キャンセル枠を戻す運用は
+  > §6.2 の手動 −1 調整で代替できる。CANCELLED を残したい場合は要相談。
 - **料金はGAS側で再計算する(サーバーが正)**。フォームはリアルタイム見積もりを表示するが、
   シートに記録されるのは `recomputeGross()` が明細から再導出した金額であり、クライアントの
   `total` は信用しない。`gas/Code.gs` の `PRICE_LOAD_TYPES` / `PRICE_SPEEDS` / `PRICE_ADDONS` は
@@ -302,7 +330,31 @@ Lalamove配達時は注文データの delivery を `Via Lalamove (customer-arra
 - `POST {action:"updateStatus", receiptNo, status, updatedBy}` … 注文のStatusを変更し、`Status Updated By` /
   `Status Updated At` に担当者名と日時を記録(要ADMIN_KEY、`status` はSTATUSESのいずれかでない場合は拒否)。
   `GET ?action=day` のbookingsに `statusUpdatedBy` / `statusUpdatedAt` として返る。
-- `setupSheet()` は Orders / BlockedSlots / PromoCodes / Riders / RiderRoster / RiderSchedule の各シートを作成。
+- `POST {action:"slotRiders", date, slot, riders}` … そのスロットのライダー数(=上限枠)を設定。
+  riders 0 で設定を消してデフォルトに戻す。`SlotRiders` シートに保存(要ADMIN_KEY)。
+- `POST {action:"slotAdjust", date, slot, adjustment}` … 手動調整値を**絶対値で**設定(数値入力欄用)。
+  従来の `delta: 1|-1` も引き続き使える。
+- `POST {action:"orderPhoto", receiptNo, name, fileName, mimeType, data(base64)}` … 洗濯物写真を
+  Driveに保存し、Ordersシートの `Photo URL` 列に追記、担当ライダーへTelegram通知(§8.2)。
+- `GET ?action=slots&date=` は `{cap, caps:{slot:上限}, counts}` を返す。**`caps` がスロット別の正**で、
+  `cap` は旧クライアント向けのフォールバック。
+- `setupSheet()` は Orders / BlockedSlots / SlotAdjustments / SlotRiders / PromoCodes / Riders /
+  RiderRoster / RiderSchedule の各シートを作成。
+
+### §8.2 洗濯物の写真アップロード(任意)
+
+- **タイミング**: 注文送信完了後の Thank you 画面。注文自体は既に確定している。
+- 説明文(EN/TL併記)と「Choose photo(s)」ボタンを表示。
+  - EN: "If you'll be leaving your laundry at your building's pickup area, upload a photo so our rider can identify it easily."
+  - TL: "Kung iiwan mo ang labada sa pickup area ng inyong building, mag-upload ng larawan para madali itong makilala ng aming rider."
+- 対応形式 JPG / PNG / HEIC、1枚最大10MB、**最大3枚**、スキップ可。
+- **1リクエスト1枚**で順次送信する(base64で約1.33倍に膨らむため、3枚同時はGASのPOSTサイズ上限に触れる)。
+- 保存先: `DRIVE_FOLDER_ID`(Script Properties)配下の `YYYY-MM / [注文ID]_[顧客名]`。
+  注文IDから年月を取り出せない場合は `unfiled` に入れる。顧客名のパス禁止文字は除去。
+- ファイルは「リンクを知っている全員が閲覧可」に設定(ライダーがGoogleログイン無しで開けるようにするため)。
+- Ordersシートの **`Photo URL` 列**に追記(複数枚はカンマ区切り)。
+- 担当ライダーのTelegramへ `📷 Customer uploaded laundry photo(s): [リンク]` を送信。
+- アップロード中はローディング表示、完了時は成功メッセージ。**失敗しても注文は成立している**旨を明示する。
 
 ### §8.1 ライダー自動アサイン機能
 

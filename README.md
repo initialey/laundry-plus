@@ -19,7 +19,7 @@
   - Single Services: Assortedと同じ7kgロード方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
-- **Separate Laundry Preference(洗い分け)**: Whites & Colored(⭐おすすめ・ハイライト表示)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed(デフォルト・無料)から選択。Mixed以外は Additional Charge 表示(追加料金はスタッフが受取時に確認)。Per Bag 選択時はバッグ数(No. of Bags)が必須になり、注文データに「Per Bag × N bags」として記録
+- **Separate Laundry Preference(洗い分け)**: **複数選択可(チェックボックス)・選択なしもOK**。Whites & Colored(⭐おすすめ)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed から必要なだけ選択。選択したものはカンマ区切りでシート・Telegram通知に記録。Per Bag を選ぶとバッグ数(No. of Bags)が必須になり「Per Bag × N bags」として記録。**それぞれの料金は合算されて合計に反映される**が、現状は全項目 `fee: 0`(金額が未設定のため。`SEPARATION` 配列に金額を入れれば即座に合算されます)
 - **Add-ons**(表示順): Bleach (White)(+20 PHP/load)/ Bleach (Color Safe)(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Extra Fabcon(+10 PHP/load)/ Extra Rinse(+50 PHP/load)/ Laundry+ Bag(+200 PHP)
 - **T&C同意**: 送信前に免責事項(EN+TL、アコーディオン表示)への同意が必須。未チェックでは送信ボタン無効。同意時刻をシートに記録
 - **プロモコード**: 合計欄でコード入力→Apply で GAS 検証(%オフ / ₱オフ、有効期限・有効フラグ・**利用回数上限(Max Uses)**・**顧客1回限り(One Time Per Customer)**対応)。割引を合計に反映し、コード・割引額をシートに記録(注文確定時にサーバー側で再検証し、有効時のみ Used Count を+1)。コードは admin.html の Promo Codes パネルで管理(追加/更新・ON/OFF・Used Countリセット・削除・Max Uses・Once-per-customer、PromoCodesシートに保存)
@@ -27,8 +27,9 @@
 - **集配スケジュール**: 希望ピックアップ/デリバリーの日付(英語表記のプルダウン、14日先まで)と時間スロットを選択
   - 時間スロットは曜日で異なる — **平日 8AM–9PM(8枠、最終 8:30–9:00 PM)/ 週末 9AM–7PM(6枠、最終 6:30–7:00 PM)**。週末は営業時間外のスロットを非表示
   - Standard=集荷2日後以降 / 24 Hours=翌日以降、いずれも全スロット自由選択
-  - **Rush / Super Rush** はデリバリー日を固定しない(集荷日以降を自由選択)。**同日**デリバリーを選んだ時だけ集荷時刻に応じた固定対応表(仕様書§6.1)で絞り込み、該当枠が無ければ「Lalamove(customer arranges/pays)」に自動切替。後日デリバリーはその日の全スロット自由選択
-  - スロット上限 = その日のライダー人数 × 4(各ライダー1枠4件、1人=4件 / 2人=8件、デフォルト2人=8件/枠)。admin.html の Rider Management で日付ごとに1/2を設定でき、人数を減らすとその日のスロット上限が下がる。満枠・ブロック済みスロットは FULL 表示で選択不可
+  - **仕上がり時間による下限**: デリバリースロットは「集荷日時 + 所要時間」以降しか選べない。Super Rush=+5時間 / Rush=+8時間 / 24 Hours=+24時間 / Standard=時間下限なし(従来の日数ルール)。条件を満たさないスロットは**グレーアウト(disabled)**で「too soon」表示。集荷時刻を変えるとリアルタイムで再計算され、条件を外れた選択は自動解除。**GAS側でも同じ検証を行い、不正な組み合わせは記録せず弾く**
+  - **Rush / Super Rush** はデリバリー日を固定しない(集荷日以降を自由選択)。同日で条件を満たす枠が無い場合は「Lalamove(customer arranges/pays)」に自動切替
+  - **スロット上限はタイムスロットごとに個別設定**(ライダー数 × 4)。デフォルトは **8:00 / 9:00 / 19:00 / 20:30 が1人=4枠**、それ以外が **2人=8枠**。admin.html の Rider Management で日付×スロット単位に1/2を設定でき、`SlotRiders` シート(日付 / タイムスロット / ライダー数 / 上限枠 / 更新日時)に保存。満枠・ブロック済みスロットは FULL 表示で選択不可
 - **連絡先**: Facebook Profile URL(**任意**・`https://www.facebook.com/yourname` 形式。空欄でOK、入力する場合のみURL形式を検証)と希望連絡手段(SMS / Messenger)
 - **City ドロップダウン**: Taguig / BGC (Bonifacio Global City) / Makati / Mandaluyong / Pasig / Other から選択(必須)
   - Mandaluyong・Pasig を選ぶと **Barangay ドロップダウン**が続けて表示される(必須、各市固有の選択肢)
@@ -36,6 +37,7 @@
   - **Other** を選ぶとフォームの続きが丸ごと無効化され、「対応可能かもしれないので直接ご相談ください」の案内(EN+TL)と Facebook Messenger への誘導ボタンを表示(サービスエリア外を自動アサインしないためのガード)
   - City + Barangay は住所欄とセットで自動アサインのジオコーディングAPIに渡される(精度向上のため)
 - 送信するとクレーム番号(`LP-YYYYMMDD-HHMMSS`)を発行して完了画面を表示
+- **洗濯物の写真アップロード(任意)**: 完了画面に写真アップロード欄を表示(EN/TL併記)。マンションのピックアップエリアに置いていく場合にライダーが識別しやすくするためのもの。JPG/PNG/HEIC・最大3枚・1枚10MBまで。Google Drive の `Laundry Plus Orders / YYYY-MM / [注文ID]_[顧客名]` に保存し、Ordersシートの `Photo URL` 列に記録(複数枚はカンマ区切り)。担当ライダーのTelegramにもリンクを追加送信。**アップロードに失敗しても注文自体は成立している**旨を画面に明示
 
 ## 管理画面(admin.html)
 
@@ -46,8 +48,8 @@
 - アクセスには管理キーが必要: `gas/Code.gs` の `ADMIN_KEY` を自分だけの値に変更し、admin.html の Key 欄に同じ値を入力(端末に保存されます)
 - ブロック情報はスプレッドシートの `BlockedSlots` シートに保存(直接編集も可)
 - **Slot Capacity Override**(Rider Management パネル内): 日付ごとに1スロットあたりの上限数を手動で直接指定できる(ライダー人数×4の自動計算を上書き)。未設定の日はこれまで通り自動計算のデフォルトを使用。Set で設定・Clear で解除、値は `Riders` シートの4列目(Capacity Override)に保存
-- **スロットの手動 +1 / −1 調整**: 各スロットに **+1 / −1** ボタンがあり、表示は「使用数 / 上限数」(例: `3 / 8`)。フォーム以外で受けた予約(電話・店頭など)を **+1** で枠として消費し、**−1** で戻せる。調整値は追加予約としてカウントされ、**予約フォーム側の空き計算にも即反映**される(実質空き = 上限 − フォーム予約数 − 手動調整数)。調整が入っているスロットには「+N manual bookings」の注記を表示。調整値は0未満にはならず(自分で足した分だけ戻せる)、`SlotAdjustments` シート(日付 / タイムスロット / 調整数 / 更新日時)に保存
-- **注文一覧のステータス管理**: 各予約行にステータスのドロップダウン(NEW / WASHING / READY / PICKED UP / CANCELLED)。変更すると即座にSheetsへ反映され、「Your Name」欄に登録した担当者名と変更日時が記録・表示される(未入力の場合は先にYour Nameの入力を促される)
+- **スロットの手動 +1 / −1 調整 + 数値直接入力**: 各スロットに **+1 / −1** ボタンと**数値入力欄**があり、表示は「使用数 / 上限数」(例: `3 / 8`)。数値欄にはその枠の合計予約数を直接入力でき、0〜上限の範囲に制限される(フォーム経由の実予約数より小さい値は拒否)。フォーム以外で受けた予約(電話・店頭など)を **+1** で枠として消費し、**−1** で戻せる。調整値は追加予約としてカウントされ、**予約フォーム側の空き計算にも即反映**される(実質空き = 上限 − フォーム予約数 − 手動調整数)。調整が入っているスロットには「+N manual bookings」の注記を表示。調整値は0未満にはならず(自分で足した分だけ戻せる)、`SlotAdjustments` シート(日付 / タイムスロット / 調整数 / 更新日時)に保存
+- **注文一覧のステータス管理**: 各予約行にステータスのドロップダウン(**NEW / ENCODED / PICKED UP / DELIVERED**)。Sheetsのステータス列にも同じ4種のドロップダウン(データ入力規則)を設定。変更すると即座にSheetsへ反映され、「Your Name」欄に登録した担当者名と変更日時が記録・表示される(未入力の場合は先にYour Nameの入力を促される)
 - **Facebookリンク**: 各予約行にFBリンクが表示され、タップでお客さんのFacebookページに遷移
 - **Riders パネル**(ライダー名簿・出勤管理・自動アサイン)
   - ①ライダー登録: 名前・拠点住所・Telegram Chat ID を入力して登録。既存ライダーは Edit で編集、ON/OFF で有効/無効切替、✕ で削除
@@ -94,7 +96,8 @@ python3 -m http.server 8787
 2. [`gas/Code.gs`](gas/Code.gs) の中身を貼り付けて保存
 3. デプロイ → 新しいデプロイ → 種類「ウェブアプリ」→ アクセス「全員」でデプロイ
 4. 発行されたウェブアプリURLを `index.html` の `GAS_ENDPOINT` に貼り付け(`admin.html` の `GAS_ENDPOINT` も同じURLに更新)
-5. 自動アサイン機能を使う場合: Apps Script エディタの プロジェクトの設定 → スクリプト プロパティ に `GEOCODING_API_KEY`(Geocoding API を有効にした Google Cloud の API キー)を追加。その後 `setupSheet()` を実行すると `RiderRoster` / `RiderSchedule` シートが作成されるので、admin.html の Riders パネルからライダーを登録・出勤設定する
+5. 写真アップロードを使う場合: スクリプト プロパティに `DRIVE_FOLDER_ID`(保存先Driveフォルダのid)を追加。未設定ならアップロード欄はエラーを返すだけで、注文機能には影響しません
+6. 自動アサイン機能を使う場合: Apps Script エディタの プロジェクトの設定 → スクリプト プロパティ に `GEOCODING_API_KEY`(Geocoding API を有効にした Google Cloud の API キー)を追加。その後 `setupSheet()` を実行すると `RiderRoster` / `RiderSchedule` シートが作成されるので、admin.html の Riders パネルからライダーを登録・出勤設定する
 
 コードを修正したときは「デプロイ → デプロイを管理 → ✏️編集 → バージョン: 新バージョン → デプロイ」
 で**URLを変えずに**更新できます。
