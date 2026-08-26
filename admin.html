@@ -121,6 +121,26 @@ button.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--yellow
 .slot .adj:hover:not(:disabled) { border-color: var(--sky); background: #fff; }
 .slot .adj:disabled { opacity: .35; cursor: default; }
 .slot .adjnote { margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--pink); }
+.slot .adjnum {
+  width: 52px; height: 26px; padding: 0 4px;
+  text-align: center; font-size: 12px; font-weight: 800;
+  border: 2px solid #cdeaf8; background: #fff; color: var(--ink-deep); border-radius: 8px;
+}
+.slot .adjnum:focus { outline: none; border-color: var(--sky); box-shadow: 0 0 0 3px rgba(63,180,230,.2); }
+.slotriders { display: flex; flex-direction: column; gap: 6px; }
+.sr {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border: 2px solid #cdeaf8; border-radius: 12px; padding: 8px 12px;
+}
+.sr .t { font-weight: 700; font-size: 13px; color: var(--ink-deep); flex: 1; min-width: 116px; }
+.sr .lb { font-size: 11px; font-weight: 800; color: #6aa9c9; }
+.sr select {
+  font-family: var(--body); font-weight: 800; font-size: 13px; color: var(--ink-deep);
+  background: #eef8fd; border: 2px solid #cdeaf8; border-radius: 8px; padding: 4px 6px;
+}
+.sr .cap { font-size: 12px; font-weight: 800; color: var(--sky-deep); }
+.sr .bk2 { font-size: 12px; font-weight: 700; color: #6aa9c9; }
+.sr.custom { border-color: var(--sky); background: #f4fbff; }
 .slot.blocked .block { border-color: var(--green); color: var(--green); }
 .bkg { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .bk {
@@ -264,12 +284,9 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
       <h2>Rider Management</h2>
       <span class="ridercap" id="riderCap"></span>
     </div>
-    <p class="ridersub">Riders working <b id="riderDay">this day</b> — each rider covers 4 bookings per slot, so the slot capacity is riders × 4 (1 rider ⇒ 4, 2 riders ⇒ 8).</p>
-    <div class="riderbtns" id="riderBtns">
-      <button class="rbtn" data-count="1">1 Rider</button>
-      <button class="rbtn" data-count="2">2 Riders</button>
-    </div>
-    <div class="legend">Set the rider count for the day shown above (use ‹ › / Today to change the date). Fewer riders ⇒ slots fill sooner on the booking form.</div>
+    <p class="ridersub">Riders per time slot on <b id="riderDay">this day</b> — each rider covers 4 bookings, so capacity is riders × 4. Early and late slots default to 1 rider; the rest to 2.</p>
+    <div class="slotriders" id="slotRiders"><div class="msg">Enter your admin key to load slots.</div></div>
+    <div class="legend">Set the rider count per slot for the day shown above (use ‹ › / Today to change the date). Fewer riders ⇒ that slot fills sooner on the booking form.</div>
 
     <div class="capoverride">
       <label class="lbl" for="capOverride">Slot Capacity Override (this day)</label>
@@ -403,7 +420,7 @@ document.getElementById("saveName").addEventListener("click", () => {
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("saveName").click(); });
 
 // Must match STATUSES in gas/Code.gs
-const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
+const STATUSES = ["NEW", "ENCODED", "PICKED UP", "DELIVERED"];
 function fmtUpdatedAt(iso) {
   try { return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
   catch (err) { return ""; }
@@ -424,46 +441,64 @@ function renderHeader() {
     : "Weekday · 8:00 AM–9:00 PM (8 slots)";
 }
 
-// ===== Rider management =====
-const riderBtns = document.getElementById("riderBtns");
-let riderBusy = false;
+// ===== Rider management (per time slot) =====
 
-function renderRiders(count, capacity, capOverride) {
-  if (typeof capacity !== "number") capacity = count * 4;
-  document.getElementById("riderDay").textContent = curDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+const slotRidersEl = document.getElementById("slotRiders");
+
+// `data` is the /day response; bookings + adjustments give the Booked figure.
+function renderRiders(data) {
+  document.getElementById("riderDay").textContent =
+    curDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+  const caps = data.caps || {};
+  const configured = data.slotRiders || {};
+  const defaults = data.defaultSlotRiders || {};
+  const adjustments = data.adjustments || {};
+  const capOverride = data.capOverride;
+
+  slotRidersEl.innerHTML = slotsForDate(curDate).map(s => {
+    const slot = s.v;
+    const cap = caps[slot] != null ? caps[slot] : (data.cap || 8);
+    const riders = configured[slot] || defaults[slot] || Math.round(cap / 4) || 2;
+    const isCustom = configured[slot] > 0;
+    const booked = (data.bookings || []).filter(b => b.slot === slot && b.status !== "CANCELLED").length
+      + (adjustments[slot] || 0);
+    return `<div class="sr ${isCustom ? "custom" : ""}">
+      <span class="t">${s.label}${s.special ? " ⚠️" : ""}</span>
+      <span class="lb">Riders:</span>
+      <select class="srsel" data-slot="${slot}" aria-label="Riders for ${s.label}">
+        <option value="1" ${riders === 1 ? "selected" : ""}>1</option>
+        <option value="2" ${riders === 2 ? "selected" : ""}>2</option>
+        ${isCustom ? `<option value="0">Default (${defaults[slot] || 2})</option>` : ""}
+      </select>
+      <span class="cap">Capacity: ${cap}</span>
+      <span class="bk2">Booked: ${booked}/${cap}</span>
+    </div>`;
+  }).join("");
+
   const overridden = capOverride != null;
-  document.getElementById("riderCap").textContent = `Slot capacity: ${capacity}/slot${overridden ? " (override)" : ""}`;
-  [...riderBtns.querySelectorAll(".rbtn")].forEach(b => {
-    b.classList.toggle("active", Number(b.dataset.count) === count);
-    b.disabled = false;
-  });
+  document.getElementById("riderCap").textContent = overridden ? `Day override: ${capOverride}/slot` : "";
   const capInput = document.getElementById("capOverride");
   if (document.activeElement !== capInput) capInput.value = overridden ? capOverride : "";
   document.getElementById("capOverrideStatus").textContent = overridden
-    ? `Manual override active: ${capOverride}/slot for this day. Tap Clear to go back to riders × 4.`
-    : `No override set — using the default (riders × 4 = ${count * 4}/slot).`;
+    ? `Manual override active: ${capOverride}/slot for every slot this day (per-slot rider counts still win). Tap Clear to remove it.`
+    : "No day-wide override set — each slot uses its own rider count above.";
 }
 
-riderBtns.addEventListener("click", async e => {
-  const btn = e.target.closest(".rbtn");
-  if (!btn || riderBusy) return;
+slotRidersEl.addEventListener("change", async e => {
+  const sr = e.target.closest(".srsel");
+  if (!sr || busy) return;
   const key = localStorage.getItem("lpAdminKey") || "";
-  if (!key) { alert("Enter your admin key first."); return; }
-  riderBusy = true;
-  [...riderBtns.querySelectorAll(".rbtn")].forEach(b => b.disabled = true);
-  try {
-    const res = await fetch(GAS_ENDPOINT, {
-      method: "POST",
-      body: JSON.stringify({ action: "riders", key, date: toISODate(curDate), count: Number(btn.dataset.count) }),
-    });
-    const data = await res.json();
-    if (!data.ok) { alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong."); }
-  } catch (err) {
-    alert("Couldn't reach the server. Please try again.");
-  } finally {
-    riderBusy = false;
-    load(); // refreshes rider display + slot caps together
-  }
+  if (!key) { alert("Enter your admin key first."); load(); return; }
+  busy = true;
+  sr.disabled = true;
+  const data = await ridersPost({
+    action: "slotRiders", key, date: toISODate(curDate),
+    slot: sr.dataset.slot, riders: Number(sr.value),
+  }).catch(() => ({ ok: false }));
+  busy = false;
+  if (!data.ok) alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong.");
+  load();
 });
 
 async function setCapOverride(value) {
@@ -504,23 +539,27 @@ async function load() {
   if (date !== toISODate(curDate)) return; // user already navigated away
 
   const cap = data.cap || 8;
-  renderRiders(typeof data.riders === "number" ? data.riders : 2, cap, data.capOverride);
+  renderRiders(data);
   let html = "";
   for (const s of slotsForDate(curDate)) {
     const slot = s.v;
     const bks = (data.bookings || []).filter(b => b.slot === slot);
     const fromForm = bks.filter(b => b.status !== "CANCELLED").length;
     const adj = (data.adjustments || {})[slot] || 0;
+    const slotCap = (data.caps && data.caps[slot] != null) ? data.caps[slot] : cap;
     const used = fromForm + adj; // manual adjustments count as extra bookings
     const blocked = (data.blocked || []).includes(slot);
-    const cls = blocked ? "blocked" : (used >= cap ? "full" : "");
+    const cls = blocked ? "blocked" : (used >= slotCap ? "full" : "");
     html += `<div class="slot ${cls}">
       <div class="top">
         <span class="time">${s.label}${s.special ? " ⚠️" : ""}</span>
-        <span class="cnt">${blocked ? "BLOCKED" : `${used} / ${cap}${used >= cap ? " FULL" : ""}`}</span>
+        <span class="cnt">${blocked ? "BLOCKED" : `${used} / ${slotCap}${used >= slotCap ? " FULL" : ""}`}</span>
         <span class="adjust">
           <button class="adj" data-slot="${slot}" data-delta="-1" title="Free up a slot (undo a manual booking)" ${adj <= 0 ? "disabled" : ""}>−1</button>
           <button class="adj" data-slot="${slot}" data-delta="1" title="Consume a slot (booking taken outside the form)">+1</button>
+          <input class="adjnum" type="number" min="0" max="${slotCap}" step="1" value="${used}"
+                 data-slot="${slot}" data-form="${fromForm}" data-cap="${slotCap}"
+                 title="Set the booked count for this slot directly (0–${slotCap})" aria-label="Booked count">
         </span>
         <button class="block" data-slot="${slot}" data-blocked="${blocked ? 1 : 0}">${blocked ? "UNBLOCK" : "BLOCK"}</button>
       </div>
@@ -602,6 +641,37 @@ slotsEl.addEventListener("click", async e => {
 
 slotsEl.addEventListener("change", async e => {
   const key = localStorage.getItem("lpAdminKey") || "";
+
+  // Direct numeric entry: the field holds the TOTAL booked count for the
+  // slot, so the stored adjustment is whatever that leaves after the real
+  // form bookings. Clamped to 0..cap, and never below the bookings that
+  // actually exist (those can only be removed by cancelling the order).
+  const num = e.target.closest(".adjnum");
+  if (num) {
+    if (!key) { alert("Enter your admin key first."); load(); return; }
+    const cap = Number(num.dataset.cap);
+    const fromForm = Number(num.dataset.form);
+    let want = Math.round(Number(num.value));
+    if (!(want >= 0)) { load(); return; }
+    want = Math.max(0, Math.min(cap, want));
+    if (want < fromForm) {
+      alert(`This slot already has ${fromForm} booking(s) from the form, so it can't go below ${fromForm}.`);
+      load();
+      return;
+    }
+    busy = true;
+    num.disabled = true;
+    const data = await ridersPost({
+      action: "slotAdjust", key, date: toISODate(curDate),
+      slot: num.dataset.slot, adjustment: want - fromForm,
+    }).catch(() => ({ ok: false }));
+    busy = false;
+    if (!data.ok) alert(data.error === "wrong key" ? "Wrong admin key." : "Something went wrong.");
+    load();
+    return;
+  }
+
+
   if (!key) { alert("Enter your admin key first."); load(); return; }
 
   const reassignSel = e.target.closest(".reassign");

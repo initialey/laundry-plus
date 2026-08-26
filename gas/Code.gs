@@ -41,10 +41,13 @@ const HEADERS = [
   "Address", "Pickup", "Delivery", "Loads", "Bango", "Separation", "Add-ons",
   "T&C Agreed", "Speed", "Notes", "Promo Code", "Discount", "Total (PHP)",
   "Assigned Rider", "Rider ID", "Distance (km)", "Assigned At",
-  "City", "Status Updated By", "Status Updated At", "Barangay",
+  "City", "Status Updated By", "Status Updated At", "Barangay", "Photo URL",
 ];
-const STATUSES = ["NEW", "WASHING", "READY", "PICKED UP", "CANCELLED"];
-const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#d3f2d9", "#e6e6e6", "#ffd6d6"];
+// Legacy rows may still read WASHING / READY / CANCELLED. Those values are
+// left untouched in the sheet; only the pick-list offered from here on is
+// narrowed to these four.
+const STATUSES = ["NEW", "ENCODED", "PICKED UP", "DELIVERED"];
+const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#ffe0c4", "#d3f2d9"];
 
 // Per-slot capacity = number of riders working that day × SLOTS_PER_RIDER.
 // Each rider covers 4 bookings per slot, so 1 rider ⇒ 4/slot, 2 riders ⇒
@@ -92,6 +95,23 @@ const RIDER_ROSTER_HEADERS = ["Rider ID", "Name", "Telegram Chat ID", "Base Addr
 const RIDER_SCHEDULE_SHEET = "RiderSchedule";
 const RIDER_SCHEDULE_HEADERS = ["Date", "Rider ID", "Rider Name", "On Duty", "Registered At"];
 
+// ===== Per-slot rider counts (slot capacity) =====
+// IMPORTANT: this is a *different* sheet from "RiderSchedule" above, which
+// holds daily rider ATTENDANCE (who is on duty) for the auto-assign feature.
+// Reusing it for per-slot capacity would destroy that data, so per-slot
+// counts live in their own sheet with the requested column layout.
+const SLOT_RIDERS_SHEET = "SlotRiders";
+const SLOT_RIDERS_HEADERS = ["Date", "Time Slot", "Riders", "Capacity", "Updated At"];
+// Slots that run with one rider by default; everything else defaults to two.
+// 08:00 / 09:00 are the early slots, 19:00 / 20:30 the late ones.
+const ONE_RIDER_SLOTS = ["08:00", "09:00", "19:00", "20:30"];
+function defaultRidersForSlot(slot) {
+  return ONE_RIDER_SLOTS.indexOf(String(slot)) !== -1 ? 1 : DEFAULT_RIDERS;
+}
+
+// Drive folder that laundry photos are filed under (Script Properties).
+const DRIVE_FOLDER_PROP = "DRIVE_FOLDER_ID";
+
 // ===== Pricing (server-side authority) =====
 // Mirror of LOAD_TYPES / SPEEDS / ADDONS in index.html. The form shows a
 // live estimate, but the figure written to the sheet is the one re-derived
@@ -113,6 +133,34 @@ const PRICE_LOAD_TYPES = {
   hanger:      { rate: 20 },
 };
 const PRICE_SPEEDS = { standard: 0, "24hrs": 70, rush: 150, superrush: 200 };
+// Minimum turnaround: the delivery slot must start at least this many hours
+// after the pickup slot. Mirrors SPEEDS[].minHours in index.html. Standard
+// has no hourly floor (it's day-based), so it's absent here.
+const SPEED_MIN_HOURS = { "24hrs": 24, rush: 8, superrush: 5 };
+
+// "YYYY-MM-DD HH:MM" -> Date, or null if it isn't in that shape.
+function parseSlotStamp(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(v || ""));
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
+}
+
+// Server-side guard for the Rush / Super Rush / 24 Hours turnaround rule.
+// Returns null when the combination is fine, or an error string when the
+// delivery slot lands before `pickup + minHours`. Lalamove deliveries and
+// anything we can't parse are left alone.
+function deliveryWindowError(data) {
+  const minHours = SPEED_MIN_HOURS[data.speed];
+  if (!minHours) return null;
+  const delivery = parseSlotStamp(data.delivery);
+  const pickup = parseSlotStamp(data.pickup);
+  if (!pickup || !delivery) return null; // Lalamove / unparseable — not our call
+  const earliest = new Date(pickup.getTime() + minHours * 3600 * 1000);
+  if (delivery.getTime() < earliest.getTime()) {
+    return "Delivery must be at least " + minHours + " hours after pickup for this speed.";
+  }
+  return null;
+}
 const PRICE_ADDONS = {
   bleach:          { fee: 20,  per: "load" },
   colorsafebleach: { fee: 20,  per: "load" },
@@ -197,6 +245,13 @@ function doPost(e) {
   if (data.action === "reassignRider") return handleReassignRider(data); // from admin.html (manual reassignment)
   if (data.action === "updateStatus") return handleUpdateStatus(data); // from admin.html (order status dropdown)
   if (data.action === "slotAdjust") return handleSlotAdjust(data); // from admin.html (+1/-1 slot buttons)
+  if (data.action === "slotRiders") return handleSlotRiders(data); // from admin.html (per-slot rider count)
+  if (data.action === "orderPhoto") return handleOrderPhoto(data); // from the Thank You screen
+
+  // Reject an impossible pickup/delivery pair before recording anything.
+  // The form already prevents this; a stale tab or a tampered payload can't.
+  const windowErr = deliveryWindowError(data);
+  if (windowErr) return jsonOut({ ok: false, error: windowErr, reload: true });
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -299,6 +354,7 @@ function doPost(e) {
     "", // Status Updated By — blank until an admin changes the status
     "", // Status Updated At
     data.barangay || "",
+    "", // Photo URL — filled in later if the customer uploads photos
   ]);
 
   // count the use only after the order is safely recorded
@@ -359,6 +415,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
 
   if (p.action === "slots" && p.date) {
+    const caps = capacitiesForDate(p.date);
     const cap = capacityForDate(p.date);
     const counts = {};
     forEachBookingOn(p.date, function (slot, type, row, idx) {
@@ -372,9 +429,9 @@ function doGet(e) {
       counts[slot] = (counts[slot] || 0) + adjustments[slot];
     });
     getBlocked(p.date).forEach(function (slot) {
-      counts[slot] = Math.max(counts[slot] || 0, cap); // report as full
+      counts[slot] = Math.max(counts[slot] || 0, caps[slot] != null ? caps[slot] : cap); // report as full
     });
-    return jsonOut({ cap: cap, counts: counts });
+    return jsonOut({ cap: cap, caps: caps, counts: counts });
   }
 
   if (p.action === "day" && p.date) {
@@ -400,6 +457,10 @@ function doGet(e) {
       ok: true, cap: capacityForDate(p.date), riders: ridersForDate(p.date),
       capOverride: capacityOverrideForDate(p.date), blocked: getBlocked(p.date), bookings: bookings,
       adjustments: slotAdjustmentsForDate(p.date),
+      caps: capacitiesForDate(p.date), slotRiders: slotRidersForDate(p.date),
+      defaultSlotRiders: (function () {
+        const d = {}; slotsForDate(p.date).forEach(function (sl) { d[sl] = defaultRidersForSlot(sl); }); return d;
+      })(),
     });
   }
 
@@ -524,10 +585,102 @@ function capacityOverrideForDate(date) {
   return null;
 }
 
-// Per-slot capacity for a date = manual override if set, else riders × SLOTS_PER_RIDER.
+// ===== Per-slot capacity =====
+// Precedence, most specific first:
+//   1. a per-slot rider count set for this exact (date, slot)  → riders × 4
+//   2. a day-wide manual capacity override (Riders sheet col D)
+//   3. the slot's default rider count (1 for the early/late slots, else 2) × 4
+// The old day-wide rider count is no longer used for capacity: setting it
+// applied to every slot at once, which is the behaviour this replaces.
+function getSlotRidersSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SLOT_RIDERS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(SLOT_RIDERS_SHEET);
+    sheet.appendRow(SLOT_RIDERS_HEADERS);
+  }
+  return sheet;
+}
+
+// { "08:00": 1, ... } — explicitly configured rider counts for a date.
+function slotRidersForDate(date) {
+  const sheet = getSlotRidersSheet();
+  const out = {};
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, SLOT_RIDERS_HEADERS.length).getValues().forEach(function (r) {
+      if (String(r[0]) !== date) return;
+      const n = Number(r[2]);
+      if (n > 0) out[String(r[1])] = n;
+    });
+  }
+  return out;
+}
+
+function capacityForSlot(date, slot, configured, dayOverride) {
+  const cfg = configured || slotRidersForDate(date);
+  if (cfg[slot] > 0) return cfg[slot] * SLOTS_PER_RIDER;
+  const override = dayOverride === undefined ? capacityOverrideForDate(date) : dayOverride;
+  if (override != null) return override;
+  return defaultRidersForSlot(slot) * SLOTS_PER_RIDER;
+}
+
+// { slot: cap } for every slot the given day actually runs.
+function capacitiesForDate(date) {
+  const configured = slotRidersForDate(date);
+  const dayOverride = capacityOverrideForDate(date);
+  const out = {};
+  slotsForDate(date).forEach(function (slot) {
+    out[slot] = capacityForSlot(date, slot, configured, dayOverride);
+  });
+  return out;
+}
+
+// Coarse day-wide fallback for older clients that read a single `cap`.
+// Per-slot capacities differ now, so `caps` from the same response is the
+// authoritative figure — this is only a sane default when it's missing.
 function capacityForDate(date) {
   const override = capacityOverrideForDate(date);
-  return override != null ? override : ridersForDate(date) * SLOTS_PER_RIDER;
+  return override != null ? override : DEFAULT_RIDERS * SLOTS_PER_RIDER;
+}
+
+// The slot list for a date — mirrors WEEKDAY_SLOTS / WEEKEND_SLOTS in index.html.
+const WEEKDAY_SLOT_VALUES = ["08:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "20:30"];
+const WEEKEND_SLOT_VALUES = ["09:00", "11:00", "13:00", "15:00", "17:00", "18:30"];
+function slotsForDate(date) {
+  const d = new Date(date + "T00:00:00");
+  const day = d.getDay();
+  return (day === 0 || day === 6) ? WEEKEND_SLOT_VALUES : WEEKDAY_SLOT_VALUES;
+}
+
+// POST { action:"slotRiders", key, date, slot, riders }
+// Sets the rider count (and therefore capacity) for one slot on one date.
+// riders of 0/blank clears the setting and restores the default.
+function handleSlotRiders(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  if (!data.date || !data.slot) return jsonOut({ ok: false, error: "missing date/slot" });
+  const riders = Math.max(0, Math.min(8, Math.round(Number(data.riders) || 0)));
+
+  const sheet = getSlotRidersSheet();
+  let rowNum = -1;
+  if (sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, SLOT_RIDERS_HEADERS.length).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === data.date && String(rows[i][1]) === data.slot) { rowNum = i + 2; break; }
+    }
+  }
+  const now = new Date();
+  if (riders === 0) {
+    if (rowNum > 0) sheet.deleteRow(rowNum); // back to the default
+  } else if (rowNum > 0) {
+    sheet.getRange(rowNum, 3, 1, 3).setValues([[riders, riders * SLOTS_PER_RIDER, now]]);
+  } else {
+    sheet.appendRow(["'" + data.date, "'" + data.slot, riders, riders * SLOTS_PER_RIDER, now]);
+  }
+  return jsonOut({
+    ok: true, date: data.date, slot: data.slot,
+    riders: riders || defaultRidersForSlot(data.slot),
+    caps: capacitiesForDate(data.date),
+  });
 }
 
 // POST { action:"riders", key, date, count?, capOverride? } — set the rider
@@ -637,14 +790,21 @@ function slotAdjustmentsForDate(date) {
 }
 
 // POST { action:"slotAdjust", key, date, slot, delta: 1|-1 }
-// Bumps the manual booking count for one slot. Clamped at 0 — "-1" only
-// takes back an adjustment previously added here, it can never push the
-// effective count below what the real (form) bookings already occupy.
+//   or  { action:"slotAdjust", key, date, slot, adjustment: n }
+// Bumps (delta) or sets (adjustment) the manual booking count for one slot.
+// Clamped at 0 — "-1" only takes back an adjustment previously added here,
+// it can never push the effective count below the real (form) bookings.
 function handleSlotAdjust(data) {
   if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
   if (!data.date || !data.slot) return jsonOut({ ok: false, error: "missing date/slot" });
-  const delta = Math.round(Number(data.delta) || 0);
-  if (delta !== 1 && delta !== -1) return jsonOut({ ok: false, error: "delta must be 1 or -1" });
+  const absolute = data.adjustment !== undefined;
+  let delta = 0;
+  if (absolute) {
+    if (!(Number(data.adjustment) >= 0)) return jsonOut({ ok: false, error: "adjustment must be >= 0" });
+  } else {
+    delta = Math.round(Number(data.delta) || 0);
+    if (delta !== 1 && delta !== -1) return jsonOut({ ok: false, error: "delta must be 1 or -1" });
+  }
 
   const sheet = getSlotAdjustSheet();
   let rowNum = -1, cur = 0;
@@ -658,7 +818,7 @@ function handleSlotAdjust(data) {
       }
     }
   }
-  const next = Math.max(0, cur + delta);
+  const next = absolute ? Math.max(0, Math.round(Number(data.adjustment))) : Math.max(0, cur + delta);
   const now = new Date();
   if (next === 0) {
     if (rowNum > 0) sheet.deleteRow(rowNum); // keep the sheet tidy: 0 means "no adjustment"
@@ -988,6 +1148,95 @@ function handleUpdateStatus(data) {
   return jsonOut({ ok: true, receiptNo: data.receiptNo, status: data.status, updatedBy: updatedBy, updatedAt: now.toISOString() });
 }
 
+// ===== Laundry photos (optional, from the Thank You screen) =====
+// POST { action:"orderPhoto", receiptNo, name, fileName, mimeType, data(base64) }
+// One photo per request — base64 inflates a 10MB image to ~13MB and GAS
+// rejects very large bodies, so batching them is unreliable.
+// Files land in  <DRIVE_FOLDER_ID>/YYYY-MM/<receiptNo>_<customer name>/.
+function handleOrderPhoto(data) {
+  if (!data.receiptNo || !data.data) return jsonOut({ ok: false, error: "missing receiptNo/data" });
+  const rootId = PropertiesService.getScriptProperties().getProperty(DRIVE_FOLDER_PROP);
+  if (!rootId) return jsonOut({ ok: false, error: "photo uploads are not configured" });
+
+  let url;
+  try {
+    const root = DriveApp.getFolderById(rootId);
+    const month = String(data.receiptNo).slice(3, 7) + "-" + String(data.receiptNo).slice(7, 9); // LP-YYYYMMDD-...
+    const monthFolder = childFolder(root, /^\d{4}-\d{2}$/.test(month) ? month : "unfiled");
+    const safeName = String(data.name || "").replace(/[\\/:*?"<>|]/g, "").trim();
+    const orderFolder = childFolder(monthFolder, data.receiptNo + (safeName ? "_" + safeName : ""));
+
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(data.data),
+      data.mimeType || "image/jpeg",
+      data.fileName || (data.receiptNo + ".jpg")
+    );
+    const file = orderFolder.createFile(blob);
+    // The rider opens this from a Telegram message, so it needs to be readable
+    // without a Google login. Nothing but the photo is exposed.
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (err) {
+      console.warn("could not relax sharing on the photo: " + err);
+    }
+    url = file.getUrl();
+  } catch (err) {
+    console.error("photo upload failed: " + err);
+    return jsonOut({ ok: false, error: "could not save the photo" });
+  }
+
+  // Record it against the order — appended, so multiple photos accumulate.
+  let orderRow = null;
+  try {
+    orderRow = appendPhotoUrl(data.receiptNo, url);
+  } catch (err) {
+    console.error("could not record the photo URL: " + err);
+  }
+
+  // Let the assigned rider know — best-effort, never fails the upload.
+  try {
+    if (orderRow) {
+      const chatId = riderChatIdFor(String(orderRow[HEADERS.indexOf("Rider ID")] || ""));
+      if (chatId) sendTelegramTo(chatId, "📷 Customer uploaded laundry photo(s): " + url);
+    }
+  } catch (err) {
+    console.error("photo notify failed: " + err);
+  }
+
+  return jsonOut({ ok: true, url: url });
+}
+
+// Find (or create) a sub-folder by name.
+function childFolder(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// Append a URL to the order's Photo URL cell (comma-separated). Returns the
+// order row, or null when the receipt isn't found.
+function appendPhotoUrl(receiptNo, url) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+  const iReceipt = HEADERS.indexOf("Receipt No");
+  const iPhoto = HEADERS.indexOf("Photo URL");
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][iReceipt]) !== receiptNo) continue;
+    const cell = sheet.getRange(i + 2, iPhoto + 1);
+    const existing = String(cell.getValue() || "").trim();
+    cell.setValue(existing ? existing + ", " + url : url);
+    return rows[i];
+  }
+  return null;
+}
+
+// Telegram chat id for a rider id, or "" when unknown.
+function riderChatIdFor(riderId) {
+  if (!riderId) return "";
+  const rider = readRiderRoster().filter(function (r) { return r.riderId === riderId; })[0];
+  return rider ? rider.chatId : "";
+}
+
 // ===== Promo codes =====
 function getPromoSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1173,6 +1422,7 @@ function setupSheet() {
   sheet.setFrozenRows(1);
   getBlockedSheet();    // create the BlockedSlots sheet too
   getSlotAdjustSheet(); // and the SlotAdjustments sheet (manual +1/-1)
+  getSlotRidersSheet(); // and the SlotRiders sheet (per-slot rider counts)
   const riders = getRidersSheet(); // create the Riders sheet too (slot-capacity headcount)
   // backfill the 4th header on a pre-existing Riders sheet from before the
   // Slot Capacity Override feature — safe no-op if it's already there
@@ -1200,9 +1450,12 @@ function setupSheet() {
   roster.setFrozenRows(1);
   getRiderScheduleSheet(); // create the RiderSchedule sheet too
 
+  // Dropdown of the four current statuses. allowInvalid stays TRUE on
+  // purpose: legacy rows still holding WASHING / READY / CANCELLED keep
+  // their value instead of being flagged or blocked.
   const statusRange = sheet.getRange("C2:C1000");
   statusRange.setDataValidation(
-    SpreadsheetApp.newDataValidation().requireValueInList(STATUSES, true).setAllowInvalid(false).build()
+    SpreadsheetApp.newDataValidation().requireValueInList(STATUSES, true).setAllowInvalid(true).build()
   );
 
   sheet.setConditionalFormatRules(STATUSES.map(function (s, i) {
