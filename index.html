@@ -939,7 +939,7 @@ footer .fsub { font-size: 10px; letter-spacing: .08em; opacity: .85; }
       <div class="line"><span>Loads subtotal <small class="loadcount" id="loadCount"></small></span><span id="subLoads">₱0</span></div>
       <div class="line"><span>Speed surcharge</span><span id="subSpeed">₱0</span></div>
       <div class="line"><span>Add-ons</span><span id="subAddons">₱0</span></div>
-      <div class="line" id="separationLine" style="display:none"><span>Separation</span><span id="subSeparation">₱0</span></div>
+      <div class="line" id="separationLine" style="display:none"><span>Separation <small class="loadcount" id="sepLoadCount"></small></span><span id="subSeparation">₱0</span></div>
       <div class="line promoline" id="promoLine" style="display:none"><span id="promoLabel">Promo</span><span id="subDiscount">−₱0</span></div>
       <div class="grand">
         <span class="t">ESTIMATED PRICE</span>
@@ -1095,15 +1095,16 @@ const ADDONS = [
 // How the customer wants their laundry separated (extra charges confirmed in-store)
 // `label` is also the value recorded in the sheet — keep it clean; display
 // extras (star, notes) live in `mark`/`note`.
-// `fee` is added to the total for every option ticked. They are all 0 today
-// because no amounts have ever been set for separation — the shop confirms
-// the charge in-store. Put real numbers here and they sum automatically.
+// Separating laundry means running the machine an extra time, so each
+// option ticked adds ONE load to the bill (Mixed washes everything
+// together, so it adds none). Per Bag is the exception: N bags means N
+// separate loads, i.e. N-1 extra ones.
 const SEPARATION = [
-  { id: "whites",     label: "Whites & Colored",   fee: 0, mark: "⭐ Our Recommendation", recommended: true, note: "Whites washed separately from colored" },
-  { id: "bedclothes", label: "Beddings & Clothes", fee: 0, note: "Beddings washed separately from clothes" },
-  { id: "bedtowels",  label: "Beddings & Towels",  fee: 0, note: "Beddings washed separately from towels" },
-  { id: "perbag",     label: "Per Bag",            fee: 0, note: "Each bag washed separately" },
-  { id: "mixed",      label: "Mixed",              fee: 0, note: "Everything washed together<br>Assorted loads may include UP TO 2KG of towels, jeans, or bedding.", free: true },
+  { id: "whites",     label: "Whites & Colored",   addsLoad: true, mark: "⭐ Our Recommendation", recommended: true, note: "Whites washed separately from colored" },
+  { id: "bedclothes", label: "Beddings & Clothes", addsLoad: true, note: "Beddings washed separately from clothes" },
+  { id: "bedtowels",  label: "Beddings & Towels",  addsLoad: true, note: "Beddings washed separately from towels" },
+  { id: "perbag",     label: "Per Bag",            addsLoad: true, perBag: true, note: "Each bag washed separately" },
+  { id: "mixed",      label: "Mixed",              addsLoad: false, note: "Everything washed together<br>Assorted loads may include UP TO 2KG of towels, jeans, or bedding.", free: true },
 ];
 
 const php = n => "₱" + n.toLocaleString("en-PH");
@@ -1121,11 +1122,29 @@ document.getElementById("separation").innerHTML = SEPARATION.map(s => `
   <label class="speed${s.recommended ? " recommend" : ""}">
     <input type="checkbox" name="separation" value="${s.id}">
     <span><span class="nm">${s.label}${s.mark ? `<span class="recbadge">${s.mark}</span>` : ""}<small>${s.note}</small></span>
-    <span class="fee">${s.free ? "FREE" : (s.fee ? "+" + php(s.fee) : "Additional Charge")}</span></span>
+    <span class="fee">${s.free ? "FREE" : (s.perBag ? "+1 load per extra bag" : "+1 load")}</span></span>
   </label>`).join("");
 const chosenSeparation = () =>
   [...document.querySelectorAll("input[name=separation]:checked")]
     .map(el => SEPARATION.find(s => s.id === el.value));
+
+// How many extra machine loads the chosen separations imply.
+function separationExtraLoads() {
+  return chosenSeparation().reduce((n, s) => {
+    if (!s.addsLoad) return n;
+    if (s.perBag) return n + Math.max(0, (parseInt(bagCount.value, 10) || 1) - 1);
+    return n + 1;
+  }, 0);
+}
+// The extra load is charged at the order's own load rate — the dearest base
+// among the load-priced rows. A press-only order has no machine load to
+// duplicate, so separation costs nothing there.
+function separationLoadRate(loads) {
+  return loads.reduce((max, l) => {
+    const t = LOAD_TYPES.find(x => x.id === l.type);
+    return (t && t.base) ? Math.max(max, t.base) : max;
+  }, 0);
+}
 
 // "Per Bag" needs the number of bags for the shop's estimate
 const bagField = document.getElementById("bagCountField");
@@ -1136,9 +1155,9 @@ function updateBagField() {
   bagCount.required = perBag;
   if (!perBag) bagCount.setCustomValidity("");
 }
-document.getElementById("separation").addEventListener("change", updateBagField);
+document.getElementById("separation").addEventListener("change", () => { updateBagField(); updateTotals(); });
 bagCount.addEventListener("invalid", () => bagCount.setCustomValidity(bagCount.dataset.err));
-bagCount.addEventListener("input", () => bagCount.setCustomValidity(""));
+bagCount.addEventListener("input", () => { bagCount.setCustomValidity(""); updateTotals(); });
 
 document.getElementById("addons").innerHTML = ADDONS.map(a => `
   <label class="check">
@@ -1257,8 +1276,11 @@ function computeTotals() {
       const a = ADDONS.find(x => x.id === el.value);
       return s + (a.per === "load" ? a.fee * totalUnits : a.fee);
     }, 0);
-  // every separation option ticked adds its own fee (all ₱0 until amounts are set)
-  const subSeparation = chosenSeparation().reduce((s, x) => s + (x.fee || 0), 0);
+  // each separation adds a whole extra load at the order's load rate. It is
+  // deliberately NOT added to totalUnits: speed and add-on per-load fees
+  // stay based on the weight the customer actually brought in.
+  const sepLoads = separationExtraLoads();
+  const subSeparation = sepLoads * separationLoadRate(loads);
   const gross = subLoads + subSpeed + subAddons + subSeparation;
   // applied promo (validated by GAS) → discount; never below ₱0
   let discount = 0;
@@ -1268,10 +1290,10 @@ function computeTotals() {
       : appliedPromo.value;
     discount = Math.min(discount, gross);
   }
-  return { loads, subLoads, subSpeed, subAddons, subSeparation, discount, total: gross - discount };
+  return { loads, subLoads, subSpeed, subAddons, subSeparation, sepLoads, discount, total: gross - discount };
 }
 function updateTotals() {
-  const { loads, subLoads, subSpeed, subAddons, subSeparation, discount, total } = computeTotals();
+  const { loads, subLoads, subSpeed, subAddons, subSeparation, sepLoads, discount, total } = computeTotals();
   [...loadsEl.querySelectorAll(".load")].forEach((row, i) => {
     const u = loads[i].units;
     row.querySelector(".amt").innerHTML =
@@ -1283,7 +1305,9 @@ function updateTotals() {
   document.getElementById("subSpeed").textContent = php(subSpeed);
   document.getElementById("subAddons").textContent = php(subAddons);
   const sepLine = document.getElementById("separationLine");
-  sepLine.style.display = subSeparation > 0 ? "" : "none";
+  sepLine.style.display = sepLoads > 0 ? "" : "none";
+  document.getElementById("sepLoadCount").textContent =
+    `(${sepLoads} extra load${sepLoads === 1 ? "" : "s"})`;
   document.getElementById("subSeparation").textContent = php(subSeparation);
   const promoLine = document.getElementById("promoLine");
   if (appliedPromo && discount > 0) {
@@ -1597,6 +1621,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
       .map(s => s.id === "perbag" ? `Per Bag × ${parseInt(bagCount.value, 10)} bags` : s.label)
       .join(", "),
     separationIds: chosenSeparation().map(s => s.id),
+    bagCount: parseInt(bagCount.value, 10) || 0,
     addons,
     addonIds, // machine-readable companion to `addons`, for the GAS re-price
     speed: speed.value,

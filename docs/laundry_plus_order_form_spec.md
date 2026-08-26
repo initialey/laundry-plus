@@ -137,9 +137,17 @@ load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/
 - **Separate Laundry Preference**(洗い分け): **複数選択可(チェックボックス)。選択なしも許容**(必須ではない)。
   選択肢: Whites & Colored / Beddings & Clothes / Beddings & Towels / Per Bag / Mixed。
   - 選択した項目は**カンマ区切り**で Ordersシートの Separation 列・Telegram通知に記録
-  - **各項目の `fee` を合算して合計に反映**する。ただし現状は全項目 `fee: 0`(洗い分けの追加料金は
-    これまで金額が定義されておらず「スタッフが受取時に確認」の運用のため)。`SEPARATION` 配列に
-    金額を入れれば自動的に合算され、合計欄に「Separation」行が出る
+  - **料金は「洗い分け1項目につき +1ロード」**。分けるということは洗濯機をもう1回まわすため。
+    - **Mixed は +0ロード**(全部まとめて洗うので追加なし)
+    - **Per Bag は +(N−1)ロード**(N袋 = N回まわす。3袋なら +2ロード)
+    - 複数選択した場合は合算(例: Whites & Colored + Per Bag 3袋 = 1 + 2 = **+3ロード**)
+  - **追加ロードの単価は「注文したサービスのロード単価」**。注文内の
+    ロード課金行のうち**最も高いbase**を使う(Assorted ₱240 / Wash・Dry Only ₱150 / Fold Only ₱80)。
+    Press系のみの注文には複製すべき洗濯機ロードが無いため、洗い分けの追加料金は**₱0**。
+  - **追加ロードはスピード料金・アドオンのper-load計算には含めない**(それらは実際に持ち込まれた
+    重量ベースのロード数で計算する)。
+    例: Assorted 7kg + Whites & Colored + 24 Hours = 240 + 240 + 70 = **₱550**
+  - 合計欄には「Separation (N extra loads)」の行が出る
   - Whites & Colored は「⭐ (Our Recommendation)」表記+カードを黄色系にハイライト(おすすめ)
   - Mixed の補足: "Assorted loads may include UP TO 2KG of towels, jeans, or bedding."
   - セクション下部の注記: "Any additional fees will be confirmed by our staff upon receiving your laundry."

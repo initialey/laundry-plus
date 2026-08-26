@@ -19,7 +19,7 @@
   - Single Services: Assortedと同じ7kgロード方式 — Wash Only 150+30/kg / Dry Only 150+30/kg / Fold Only 80+15/kg
   - Press Only: 155 PHP/kg、または枚数単位(Tops 40 / Bottoms 55 / Simple Dress 80 / Long Dress 105 / Jacket 105 / Hanger w/ Dust Bag 20)
 - **Bango Level**: 香り強さを None / Less / Normal / Extra / Ultra から選択
-- **Separate Laundry Preference(洗い分け)**: **複数選択可(チェックボックス)・選択なしもOK**。Whites & Colored(⭐おすすめ)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed から必要なだけ選択。選択したものはカンマ区切りでシート・Telegram通知に記録。Per Bag を選ぶとバッグ数(No. of Bags)が必須になり「Per Bag × N bags」として記録。**それぞれの料金は合算されて合計に反映される**が、現状は全項目 `fee: 0`(金額が未設定のため。`SEPARATION` 配列に金額を入れれば即座に合算されます)
+- **Separate Laundry Preference(洗い分け)**: **複数選択可(チェックボックス)・選択なしもOK**。Whites & Colored(⭐おすすめ)/ Beddings & Clothes / Beddings & Towels / Per Bag / Mixed から必要なだけ選択。選択したものはカンマ区切りでシート・Telegram通知に記録。Per Bag を選ぶとバッグ数(No. of Bags)が必須になり「Per Bag × N bags」として記録。料金は**洗い分け1項目につき +1ロード**(洗濯機をもう1回まわすため)。Mixed は +0、**Per Bag は +(N−1)ロード**(3袋なら+2)。追加ロードの単価は注文したサービスのロード単価(Assorted ₱240 / Wash・Dry Only ₱150 / Fold Only ₱80)で、**スピード料金・アドオンのper-load計算には含めない**
 - **Add-ons**(表示順): Bleach (White)(+20 PHP/load)/ Bleach (Color Safe)(+20 PHP/load)/ Extra Detergent(+10 PHP/load)/ Extra Fabcon(+10 PHP/load)/ Extra Rinse(+50 PHP/load)/ Laundry+ Bag(+200 PHP)
 - **T&C同意**: 送信前に免責事項(EN+TL、アコーディオン表示)への同意が必須。未チェックでは送信ボタン無効。同意時刻をシートに記録
 - **プロモコード**: 合計欄でコード入力→Apply で GAS 検証(%オフ / ₱オフ、有効期限・有効フラグ・**利用回数上限(Max Uses)**・**顧客1回限り(One Time Per Customer)**対応)。割引を合計に反映し、コード・割引額をシートに記録(注文確定時にサーバー側で再検証し、有効時のみ Used Count を+1)。コードは admin.html の Promo Codes パネルで管理(追加/更新・ON/OFF・Used Countリセット・削除・Max Uses・Once-per-customer、PromoCodesシートに保存)
