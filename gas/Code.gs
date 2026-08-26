@@ -161,6 +161,16 @@ function deliveryWindowError(data) {
   }
   return null;
 }
+// Separation options that add a machine load. Mixed washes everything
+// together so it adds none; Per Bag adds one per EXTRA bag (N bags = N
+// loads = N-1 extra). Mirrors SEPARATION in index.html.
+const PRICE_SEPARATION = {
+  whites:     { addsLoad: true },
+  bedclothes: { addsLoad: true },
+  bedtowels:  { addsLoad: true },
+  perbag:     { addsLoad: true, perBag: true },
+  mixed:      { addsLoad: false },
+};
 const PRICE_ADDONS = {
   bleach:          { fee: 20,  per: "load" },
   colorsafebleach: { fee: 20,  per: "load" },
@@ -217,6 +227,29 @@ function recomputeGross(data) {
   if (speedFee === undefined) return null;
   const subSpeed = speedFee * units;
 
+  // Separation: each choice is an extra machine load, charged at the
+  // dearest base rate in the order. Not folded into `units` — speed and
+  // add-on per-load fees stay based on the weight actually brought in.
+  let sepLoads = 0;
+  const sepIds = data.separationIds;
+  if (sepIds) {
+    if (!Array.isArray(sepIds)) return null;
+    for (let k = 0; k < sepIds.length; k++) {
+      const sep = PRICE_SEPARATION[sepIds[k]];
+      if (!sep) return null;
+      if (!sep.addsLoad) continue;
+      sepLoads += sep.perBag ? Math.max(0, (Number(data.bagCount) || 1) - 1) : 1;
+    }
+  } else if (String(data.separation || "").trim()) {
+    return null; // separations were chosen but we have no ids to price them by
+  }
+  let sepRate = 0;
+  for (let m = 0; m < rows.length; m++) {
+    const t = PRICE_LOAD_TYPES[rows[m].type];
+    if (t && t.base) sepRate = Math.max(sepRate, t.base);
+  }
+  const subSeparation = sepLoads * sepRate;
+
   // addonIds is the machine-readable companion to the display strings in
   // `addons`; without it we can't price add-ons and must not guess.
   let subAddons = 0;
@@ -231,8 +264,9 @@ function recomputeGross(data) {
     return null; // add-ons were chosen but we have no ids to price them by
   }
 
-  return { subLoads: subLoads, subSpeed: subSpeed, subAddons: subAddons, units: units,
-           gross: subLoads + subSpeed + subAddons };
+  return { subLoads: subLoads, subSpeed: subSpeed, subAddons: subAddons,
+           subSeparation: subSeparation, sepLoads: sepLoads, units: units,
+           gross: subLoads + subSpeed + subAddons + subSeparation };
 }
 
 function doPost(e) {
