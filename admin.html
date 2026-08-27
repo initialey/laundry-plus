@@ -453,13 +453,16 @@ function renderRiders(data) {
   const caps = data.caps || {};
   const configured = data.slotRiders || {};
   const defaults = data.defaultSlotRiders || {};
+  // bookings-per-rider varies by slot (8:30–9:00 PM is a half-hour slot at 2)
+  const perRider = data.slotsPerRider || {};
   const adjustments = data.adjustments || {};
   const capOverride = data.capOverride;
 
   slotRidersEl.innerHTML = slotsForDate(curDate).map(s => {
     const slot = s.v;
     const cap = caps[slot] != null ? caps[slot] : (data.cap || 8);
-    const riders = configured[slot] || defaults[slot] || Math.round(cap / 4) || 2;
+    const each = perRider[slot] || 4;
+    const riders = configured[slot] || defaults[slot] || Math.round(cap / each) || 2;
     const isCustom = configured[slot] > 0;
     const booked = (data.bookings || []).filter(b => b.slot === slot && b.status !== "CANCELLED").length
       + (adjustments[slot] || 0);
@@ -471,7 +474,7 @@ function renderRiders(data) {
         <option value="2" ${riders === 2 ? "selected" : ""}>2</option>
         ${isCustom ? `<option value="0">Default (${defaults[slot] || 2})</option>` : ""}
       </select>
-      <span class="cap">Capacity: ${cap}</span>
+      <span class="cap">Capacity: ${cap}${each !== 4 ? ` (${each}/rider)` : ""}</span>
       <span class="bk2">Booked: ${booked}/${cap}</span>
     </div>`;
   }).join("");

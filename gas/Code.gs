@@ -55,6 +55,16 @@ const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#ffe0c4", "#d3f2d9"];
 // Riders sheet (Date, Count, Updated At).
 const DEFAULT_RIDERS = 2;
 const SLOTS_PER_RIDER = 4;
+// Per-slot exception to SLOTS_PER_RIDER. 8:30–9:00 PM is only half an hour
+// long, so a rider can realistically cover 2 bookings there, not 4.
+// Add a slot here to give it its own per-rider figure.
+const SLOTS_PER_RIDER_BY_SLOT = {
+  "20:30": 2, // 8:30–9:00 PM — 30-minute slot
+};
+function slotsPerRiderFor(slot) {
+  const n = SLOTS_PER_RIDER_BY_SLOT[String(slot)];
+  return n > 0 ? n : SLOTS_PER_RIDER;
+}
 const RIDERS_SHEET = "Riders";
 
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
@@ -495,6 +505,9 @@ function doGet(e) {
       defaultSlotRiders: (function () {
         const d = {}; slotsForDate(p.date).forEach(function (sl) { d[sl] = defaultRidersForSlot(sl); }); return d;
       })(),
+      slotsPerRider: (function () {
+        const d = {}; slotsForDate(p.date).forEach(function (sl) { d[sl] = slotsPerRiderFor(sl); }); return d;
+      })(),
     });
   }
 
@@ -652,10 +665,10 @@ function slotRidersForDate(date) {
 
 function capacityForSlot(date, slot, configured, dayOverride) {
   const cfg = configured || slotRidersForDate(date);
-  if (cfg[slot] > 0) return cfg[slot] * SLOTS_PER_RIDER;
+  if (cfg[slot] > 0) return cfg[slot] * slotsPerRiderFor(slot);
   const override = dayOverride === undefined ? capacityOverrideForDate(date) : dayOverride;
   if (override != null) return override;
-  return defaultRidersForSlot(slot) * SLOTS_PER_RIDER;
+  return defaultRidersForSlot(slot) * slotsPerRiderFor(slot);
 }
 
 // { slot: cap } for every slot the given day actually runs.
@@ -706,9 +719,9 @@ function handleSlotRiders(data) {
   if (riders === 0) {
     if (rowNum > 0) sheet.deleteRow(rowNum); // back to the default
   } else if (rowNum > 0) {
-    sheet.getRange(rowNum, 3, 1, 3).setValues([[riders, riders * SLOTS_PER_RIDER, now]]);
+    sheet.getRange(rowNum, 3, 1, 3).setValues([[riders, riders * slotsPerRiderFor(data.slot), now]]);
   } else {
-    sheet.appendRow(["'" + data.date, "'" + data.slot, riders, riders * SLOTS_PER_RIDER, now]);
+    sheet.appendRow(["'" + data.date, "'" + data.slot, riders, riders * slotsPerRiderFor(data.slot), now]);
   }
   return jsonOut({
     ok: true, date: data.date, slot: data.slot,
