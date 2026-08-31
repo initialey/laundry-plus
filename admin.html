@@ -455,6 +455,9 @@ function renderRiders(data) {
   const defaults = data.defaultSlotRiders || {};
   // bookings-per-rider varies by slot (8:30–9:00 PM is a half-hour slot at 2)
   const perRider = data.slotsPerRider || {};
+  // Weekends are a flat cap per slot, whatever the rider count says.
+  const weekend = !!data.weekend;
+  const weekendCap = data.weekendCap || 4;
   const adjustments = data.adjustments || {};
   const capOverride = data.capOverride;
 
@@ -462,7 +465,7 @@ function renderRiders(data) {
     const slot = s.v;
     const cap = caps[slot] != null ? caps[slot] : (data.cap || 8);
     const each = perRider[slot] || 4;
-    const riders = configured[slot] || defaults[slot] || Math.round(cap / each) || 2;
+    const riders = configured[slot] || defaults[slot] || (weekend ? 1 : Math.round(cap / each)) || 2;
     const isCustom = configured[slot] > 0;
     const booked = (data.bookings || []).filter(b => b.slot === slot && b.status !== "CANCELLED").length
       + (adjustments[slot] || 0);
@@ -474,18 +477,22 @@ function renderRiders(data) {
         <option value="2" ${riders === 2 ? "selected" : ""}>2</option>
         ${isCustom ? `<option value="0">Default (${defaults[slot] || 2})</option>` : ""}
       </select>
-      <span class="cap">Capacity: ${cap}${each !== 4 ? ` (${each}/rider)` : ""}</span>
+      <span class="cap">Capacity: ${cap}${weekend ? "" : (each !== 4 ? ` (${each}/rider)` : "")}</span>
       <span class="bk2">Booked: ${booked}/${cap}</span>
     </div>`;
   }).join("");
 
   const overridden = capOverride != null;
-  document.getElementById("riderCap").textContent = overridden ? `Day override: ${capOverride}/slot` : "";
+  document.getElementById("riderCap").textContent = overridden
+    ? `Day override: ${capOverride}/slot`
+    : (weekend ? `Weekend: ${weekendCap} slots (fixed)` : "");
   const capInput = document.getElementById("capOverride");
   if (document.activeElement !== capInput) capInput.value = overridden ? capOverride : "";
   document.getElementById("capOverrideStatus").textContent = overridden
-    ? `Manual override active: ${capOverride}/slot for every slot this day (per-slot rider counts still win). Tap Clear to remove it.`
-    : "No day-wide override set — each slot uses its own rider count above.";
+    ? `Manual override active: ${capOverride}/slot for every slot this day${weekend ? "" : " (per-slot rider counts still win)"}. Tap Clear to remove it.`
+    : weekend
+      ? `Weekend: every slot is fixed at ${weekendCap}, whatever the rider counts say. Manual +1/−1 adjustments still apply; set an override here to change the figure.`
+      : "No day-wide override set — each slot uses its own rider count above.";
 }
 
 slotRidersEl.addEventListener("change", async e => {
