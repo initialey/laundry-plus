@@ -55,6 +55,31 @@ const STATUS_COLORS = ["#fff3c4", "#cfe8ff", "#ffe0c4", "#d3f2d9"];
 // Riders sheet (Date, Count, Updated At).
 const DEFAULT_RIDERS = 2;
 const SLOTS_PER_RIDER = 4;
+// Per-slot exception to SLOTS_PER_RIDER. 8:30–9:00 PM is only half an hour
+// long, so a rider can realistically cover 2 bookings there, not 4.
+// Add a slot here to give it its own per-rider figure.
+const SLOTS_PER_RIDER_BY_SLOT = {
+  "20:30": 2, // 8:30–9:00 PM — 30-minute slot
+};
+function slotsPerRiderFor(slot) {
+  const n = SLOTS_PER_RIDER_BY_SLOT[String(slot)];
+  return n > 0 ? n : SLOTS_PER_RIDER;
+}
+// Saturdays and Sundays run a flat capacity: every slot takes WEEKEND_SLOT_CAP
+// bookings whatever the rider count is, including the half-hour last slot. The
+// weekday rules above (riders × per-slot figure) are untouched. Manual +1/-1
+// slot adjustments and the day-wide Slot Capacity Override still apply.
+const WEEKEND_SLOT_CAP = 4;
+function isWeekendDate(date) {
+  const day = new Date(String(date) + "T00:00:00").getDay();
+  return day === 0 || day === 6;
+}
+// The bookings-per-rider figure actually in force for a (date, slot) pair.
+// On weekends capacity is fixed rather than derived from riders, so the figure
+// is the flat cap itself — which keeps `capacity / perRider` reading as 1 rider.
+function slotsPerRiderOn(date, slot) {
+  return isWeekendDate(date) ? WEEKEND_SLOT_CAP : slotsPerRiderFor(slot);
+}
 const RIDERS_SHEET = "Riders";
 
 // Manually closed slots (managed from admin.html). Rows: Date, Slot.
@@ -495,6 +520,10 @@ function doGet(e) {
       defaultSlotRiders: (function () {
         const d = {}; slotsForDate(p.date).forEach(function (sl) { d[sl] = defaultRidersForSlot(sl); }); return d;
       })(),
+      slotsPerRider: (function () {
+        const d = {}; slotsForDate(p.date).forEach(function (sl) { d[sl] = slotsPerRiderOn(p.date, sl); }); return d;
+      })(),
+      weekend: isWeekendDate(p.date), weekendCap: WEEKEND_SLOT_CAP,
     });
   }
 
@@ -651,11 +680,15 @@ function slotRidersForDate(date) {
 }
 
 function capacityForSlot(date, slot, configured, dayOverride) {
-  const cfg = configured || slotRidersForDate(date);
-  if (cfg[slot] > 0) return cfg[slot] * SLOTS_PER_RIDER;
   const override = dayOverride === undefined ? capacityOverrideForDate(date) : dayOverride;
+  // Weekends ignore rider counts entirely — every slot is capped at 4. An
+  // explicit day-wide override is still honoured, since that is an admin
+  // typing a number rather than a headcount being read.
+  if (isWeekendDate(date)) return override != null ? override : WEEKEND_SLOT_CAP;
+  const cfg = configured || slotRidersForDate(date);
+  if (cfg[slot] > 0) return cfg[slot] * slotsPerRiderFor(slot);
   if (override != null) return override;
-  return defaultRidersForSlot(slot) * SLOTS_PER_RIDER;
+  return defaultRidersForSlot(slot) * slotsPerRiderFor(slot);
 }
 
 // { slot: cap } for every slot the given day actually runs.
@@ -674,16 +707,15 @@ function capacitiesForDate(date) {
 // authoritative figure — this is only a sane default when it's missing.
 function capacityForDate(date) {
   const override = capacityOverrideForDate(date);
-  return override != null ? override : DEFAULT_RIDERS * SLOTS_PER_RIDER;
+  if (override != null) return override;
+  return isWeekendDate(date) ? WEEKEND_SLOT_CAP : DEFAULT_RIDERS * SLOTS_PER_RIDER;
 }
 
 // The slot list for a date — mirrors WEEKDAY_SLOTS / WEEKEND_SLOTS in index.html.
 const WEEKDAY_SLOT_VALUES = ["08:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "20:30"];
 const WEEKEND_SLOT_VALUES = ["09:00", "11:00", "13:00", "15:00", "17:00", "18:30"];
 function slotsForDate(date) {
-  const d = new Date(date + "T00:00:00");
-  const day = d.getDay();
-  return (day === 0 || day === 6) ? WEEKEND_SLOT_VALUES : WEEKDAY_SLOT_VALUES;
+  return isWeekendDate(date) ? WEEKEND_SLOT_VALUES : WEEKDAY_SLOT_VALUES;
 }
 
 // POST { action:"slotRiders", key, date, slot, riders }
@@ -703,12 +735,17 @@ function handleSlotRiders(data) {
     }
   }
   const now = new Date();
+  // Column D records the capacity this setting actually produces. On weekends
+  // that is the flat cap, not riders × the per-slot figure.
+  const storedCapacity = isWeekendDate(data.date)
+    ? WEEKEND_SLOT_CAP
+    : riders * slotsPerRiderFor(data.slot);
   if (riders === 0) {
     if (rowNum > 0) sheet.deleteRow(rowNum); // back to the default
   } else if (rowNum > 0) {
-    sheet.getRange(rowNum, 3, 1, 3).setValues([[riders, riders * SLOTS_PER_RIDER, now]]);
+    sheet.getRange(rowNum, 3, 1, 3).setValues([[riders, storedCapacity, now]]);
   } else {
-    sheet.appendRow(["'" + data.date, "'" + data.slot, riders, riders * SLOTS_PER_RIDER, now]);
+    sheet.appendRow(["'" + data.date, "'" + data.slot, riders, storedCapacity, now]);
   }
   return jsonOut({
     ok: true, date: data.date, slot: data.slot,
