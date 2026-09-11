@@ -305,6 +305,7 @@ function doPost(e) {
   if (data.action === "updateStatus") return handleUpdateStatus(data); // from admin.html (order status dropdown)
   if (data.action === "slotAdjust") return handleSlotAdjust(data); // from admin.html (+1/-1 slot buttons)
   if (data.action === "slotRiders") return handleSlotRiders(data); // from admin.html (per-slot rider count)
+  if (data.action === "reschedule") return handleReschedule(data); // from admin.html (move a booking to another slot)
   if (data.action === "orderPhoto") return handleOrderPhoto(data); // from the Thank You screen
 
   // Reject an impossible pickup/delivery pair before recording anything.
@@ -1217,6 +1218,124 @@ function handleUpdateStatus(data) {
   sheet.getRange(rowNum, HEADERS.indexOf("Status Updated By") + 1, 1, 2).setValues([[updatedBy, now]]);
 
   return jsonOut({ ok: true, receiptNo: data.receiptNo, status: data.status, updatedBy: updatedBy, updatedAt: now.toISOString() });
+}
+
+// ===== Reschedule (from admin.html) =====
+// Standard / 24 Hours also carry a day floor — the delivery DATE must be at
+// least this many days after the pickup date. Mirrors SPEEDS[].days in
+// index.html (the hourly floor is SPEED_MIN_HOURS above).
+const SPEED_MIN_DAYS = { standard: 2, "24hrs": 1 };
+
+// The booking form's pickup → delivery rules, applied to a proposed pair of
+// "YYYY-MM-DD HH:MM" stamps. Returns null when fine, else an error string.
+// A Lalamove delivery has no slot, so there is nothing to compare.
+function scheduleRuleError(speed, pickupStamp, deliveryStamp) {
+  const pickup = parseSlotStamp(pickupStamp);
+  const delivery = parseSlotStamp(deliveryStamp);
+  if (!pickup || !delivery) return null;
+  if (delivery.getTime() <= pickup.getTime()) return "Delivery must be after pickup.";
+  const minDays = SPEED_MIN_DAYS[speed];
+  if (minDays) {
+    const pickupDay = new Date(pickup.getFullYear(), pickup.getMonth(), pickup.getDate());
+    const deliveryDay = new Date(delivery.getFullYear(), delivery.getMonth(), delivery.getDate());
+    if (Math.round((deliveryDay - pickupDay) / 86400000) < minDays) {
+      return "Delivery must be at least " + minDays + " day" + (minDays === 1 ? "" : "s") + " after pickup for this speed.";
+    }
+  }
+  return deliveryWindowError({ speed: speed, pickup: pickupStamp, delivery: deliveryStamp });
+}
+
+// Bookings held in one (date, slot): form orders that aren't cancelled plus
+// manual adjustments — the same figure ?action=slots reports to the form.
+function slotUsage(date, slot) {
+  let used = slotAdjustmentsForDate(date)[slot] || 0;
+  forEachBookingOn(date, function (s, type, row, idx) {
+    if (s === slot && String(row[idx.status]) !== "CANCELLED") used++;
+  });
+  return used;
+}
+
+// POST { action:"reschedule", key, receiptNo, type:"pickup"|"delivery", date, slot, updatedBy? }
+// Moves one leg of an existing order to another slot. Only that order's
+// Pickup or Delivery cell is rewritten — every other column stays as it was.
+// Slot usage is counted from the Orders sheet, so this one write both
+// releases the old slot and takes the new one.
+function handleReschedule(data) {
+  if (data.key !== ADMIN_KEY) return jsonOut({ ok: false, error: "wrong key" });
+  const type = data.type;
+  const date = String(data.date || "");
+  const slot = String(data.slot || "");
+  if (!data.receiptNo) return jsonOut({ ok: false, error: "missing receiptNo" });
+  if (type !== "pickup" && type !== "delivery") return jsonOut({ ok: false, error: "type must be pickup or delivery" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || slotsForDate(date).indexOf(slot) === -1) {
+    return jsonOut({ ok: false, error: "That isn't a time slot on " + date + "." });
+  }
+  const target = date + " " + slot;
+  if (parseSlotStamp(target).getTime() <= Date.now()) {
+    return jsonOut({ ok: false, error: "That slot has already started." });
+  }
+
+  // Held across the capacity check and the write, so two admins can't both
+  // take the last place in the same slot.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jsonOut({ ok: false, error: "The server is busy. Please try again." });
+  let row, from;
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 2) return jsonOut({ ok: false, error: "no orders" });
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+    const iReceipt = HEADERS.indexOf("Receipt No");
+    let rowNum = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][iReceipt]) === data.receiptNo) { rowNum = i + 2; row = rows[i]; break; }
+    }
+    if (rowNum < 0) return jsonOut({ ok: false, error: "order not found" });
+
+    const status = String(row[HEADERS.indexOf("Status")]);
+    if (status === "CANCELLED" || status === "DELIVERED") {
+      return jsonOut({ ok: false, error: "This order is " + status + " and can't be rescheduled." });
+    }
+    const iCol = HEADERS.indexOf(type === "pickup" ? "Pickup" : "Delivery");
+    from = String(row[iCol] || "");
+    if (from === target) return jsonOut({ ok: false, error: "The " + type + " is already in that slot." });
+
+    // The order's speed (and price) don't change, so the new times must
+    // still satisfy that speed's turnaround.
+    const pickup = type === "pickup" ? target : String(row[HEADERS.indexOf("Pickup")] || "");
+    const delivery = type === "delivery" ? target : String(row[HEADERS.indexOf("Delivery")] || "");
+    const ruleErr = scheduleRuleError(String(row[HEADERS.indexOf("Speed")]), pickup, delivery);
+    if (ruleErr) {
+      return jsonOut({ ok: false, error: ruleErr + (type === "pickup"
+        ? " The delivery is " + (delivery || "-") + " — move it first."
+        : " The pickup is " + (pickup || "-") + ".") });
+    }
+
+    if (getBlocked(date).indexOf(slot) !== -1) return jsonOut({ ok: false, error: "That slot is blocked." });
+    const cap = capacityForSlot(date, slot);
+    const used = slotUsage(date, slot);
+    if (used >= cap) return jsonOut({ ok: false, error: "That slot is full (" + used + " / " + cap + ")." });
+
+    sheet.getRange(rowNum, iCol + 1).setValue("'" + target); // text, same as a new order
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  // Tell the shop and the assigned rider — best-effort, the move is saved.
+  try {
+    const by = String(data.updatedBy || "").trim();
+    const msg = "🔁 Rescheduled " + data.receiptNo + "\n" +
+      "👤 " + row[HEADERS.indexOf("Name")] + "\n" +
+      (type === "pickup" ? "🚚 Pickup: " : "🏠 Delivery: ") + (from || "-") + " → " + target +
+      (by ? "\n✏️ by " + by : "");
+    sendTelegram(msg);
+    const chatId = riderChatIdFor(String(row[HEADERS.indexOf("Rider ID")] || ""));
+    if (chatId) sendTelegramTo(chatId, msg);
+  } catch (err) {
+    console.error("reschedule notify failed: " + err);
+  }
+
+  return jsonOut({ ok: true, receiptNo: data.receiptNo, type: type, from: from, to: target });
 }
 
 // ===== Laundry photos (optional, from the Thank You screen) =====
