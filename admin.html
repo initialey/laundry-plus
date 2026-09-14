@@ -242,6 +242,18 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
 .bk select.statusSel { font-family: var(--body); font-weight: 700; font-size: 11px; border-radius: 8px; border: 2px solid #cdeaf8; background: #fff; color: var(--ink-deep); padding: 3px 6px; max-width: 120px; }
 .bk .fblink { color: var(--sky-deep); }
 .bk .upd { font-size: 10px; color: #6aa9c9; font-weight: 700; flex-basis: 100%; }
+.bk .rsbtn { font-family: var(--body); font-weight: 800; font-size: 11px; border-radius: 999px; border: 2px solid #cdeaf8; background: transparent; color: var(--sky-deep); padding: 3px 10px; cursor: pointer; }
+.bk .rsbtn:hover { border-color: var(--sky-deep); }
+.rspanel { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 2px; padding: 10px; background: #fff; border: 2px solid var(--sky); border-radius: 10px; }
+.rspanel .rstitle { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); }
+.rspanel .rsrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.rspanel input.rsdate { width: auto; flex: 1; min-width: 140px; font-size: 13px; padding: 6px 8px; }
+.rspanel select.rsslot { flex: 2; min-width: 180px; font-family: var(--body); font-weight: 700; font-size: 13px; color: var(--ink-deep); background: #eef8fd; border: 2px solid #cdeaf8; border-radius: 12px; padding: 6px 8px; }
+.rspanel .btn { font-size: 13px; padding: 7px 14px; }
+.rspanel .btn:disabled { opacity: .5; cursor: default; }
+.rspanel .rscancel { background: transparent; border: 2px solid #cdeaf8; color: #6aa9c9; box-shadow: none; }
+.rspanel .rsmsg { font-size: 12px; font-weight: 700; color: var(--red); }
+.rspanel .rsmsg:empty { display: none; }
 .capoverride { margin-top: 14px; padding-top: 14px; border-top: 2px solid #eef8fd; }
 .capoverride .pf-row input { flex: 1; }
 .capoverride .pf-row .btn { flex-shrink: 0; }
@@ -334,7 +346,8 @@ footer { text-align: center; font-weight: 800; font-size: 11px; letter-spacing: 
   <div class="card">
     <div class="slots" id="slots"><div class="msg">Enter your admin key to load the schedule.</div></div>
     <div class="legend">Tap BLOCK to close a slot for new bookings (shows as FULL on the form) · UNBLOCK reopens it. Cancelled orders don't count toward the cap.<br>
-    Use <b>+1</b> when you take a booking outside the form (walk-in, phone) so it still uses up a slot, and <b>−1</b> to give that slot back. The count shows used / cap, including manual bookings.</div>
+    Use <b>+1</b> when you take a booking outside the form (walk-in, phone) so it still uses up a slot, and <b>−1</b> to give that slot back. The count shows used / cap, including manual bookings.<br>
+    <b>Reschedule</b> moves a pickup or delivery to another date/slot — the old slot frees up and the new one is taken. Full and blocked slots can't be chosen.</div>
   </div>
 
   <div class="card">
@@ -588,6 +601,7 @@ async function load() {
             <option value="">Unassigned</option>
             ${riderRoster.filter(r => r.active).map(r => `<option value="${esc(r.riderId)}" ${r.riderId === b.riderId ? "selected" : ""}>${esc(r.name || r.riderId)}</option>`).join("")}
           </select>
+          ${b.status !== "CANCELLED" && b.status !== "DELIVERED" ? `<button type="button" class="rsbtn" data-receipt="${esc(b.receipt)}" data-type="${b.type}" data-slot="${slot}" data-name="${esc(b.name)}">Reschedule</button>` : ""}
           ${b.statusUpdatedBy ? `<span class="upd">Status by ${esc(b.statusUpdatedBy)}${b.statusUpdatedAt ? " · " + fmtUpdatedAt(b.statusUpdatedAt) : ""}</span>` : ""}
         </div>`).join("") + `</div>` : ""}
     </div>`;
@@ -597,6 +611,12 @@ async function load() {
 
 slotsEl.addEventListener("click", async e => {
   if (busy) return;
+
+  const rsBtn = e.target.closest(".rsbtn");
+  if (rsBtn) { openReschedule(rsBtn); return; }
+  if (e.target.closest(".rscancel")) { closeReschedule(); return; }
+  const rsGo = e.target.closest(".rsgo");
+  if (rsGo) { await confirmReschedule(rsGo.closest(".rspanel")); return; }
 
   const adjBtn = e.target.closest(".adj");
   if (adjBtn) {
@@ -650,6 +670,12 @@ slotsEl.addEventListener("click", async e => {
 });
 
 slotsEl.addEventListener("change", async e => {
+  if (e.target.closest(".rsdate")) { fillRescheduleSlots(e.target.closest(".rspanel")); return; }
+  if (e.target.closest(".rsslot")) {
+    e.target.closest(".rspanel").querySelector(".rsgo").disabled = !e.target.value;
+    return;
+  }
+
   const key = localStorage.getItem("lpAdminKey") || "";
 
   // Direct numeric entry: the field holds the TOTAL booked count for the
@@ -711,6 +737,114 @@ slotsEl.addEventListener("change", async e => {
     load();
   }
 });
+
+// ===== Reschedule =====
+// Moves one pickup or delivery to another date/slot. The server rewrites only
+// that order's Pickup/Delivery cell, so the old slot frees up and the new one
+// fills in the same step; it also refuses full, blocked or past slots.
+
+// "2026-07-12 15:00" → "Sun, Jul 12 · 3:00–4:30 PM"
+function fmtSlotStamp(stamp) {
+  const [d, t] = String(stamp).split(" ");
+  const day = new Date(d + "T00:00:00");
+  if (isNaN(day)) return String(stamp);
+  const s = slotsForDate(day).find(x => x.v === t);
+  return `${day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${s ? s.label : t}`;
+}
+
+function closeReschedule() {
+  slotsEl.querySelectorAll(".rspanel").forEach(p => p.remove());
+}
+
+function openReschedule(btn) {
+  closeReschedule();
+  const today = toISODate(new Date());
+  const shown = toISODate(curDate);
+  const panel = document.createElement("div");
+  panel.className = "rspanel";
+  panel.dataset.receipt = btn.dataset.receipt;
+  panel.dataset.type = btn.dataset.type;
+  panel.dataset.name = btn.dataset.name;
+  panel.dataset.from = `${shown} ${btn.dataset.slot}`;
+  panel.innerHTML = `
+    <div class="rstitle">Move this ${btn.dataset.type === "pickup" ? "pickup" : "delivery"} to</div>
+    <div class="rsrow">
+      <input type="date" class="rsdate" min="${today}" value="${shown < today ? today : shown}" aria-label="New date">
+      <select class="rsslot" aria-label="New time slot"></select>
+    </div>
+    <div class="rsrow">
+      <button type="button" class="btn rsgo" disabled>Confirm Reschedule</button>
+      <button type="button" class="btn rscancel">Cancel</button>
+    </div>
+    <div class="rsmsg"></div>`;
+  btn.closest(".bk").appendChild(panel);
+  fillRescheduleSlots(panel);
+}
+
+// Lists the chosen date's slots with what's left in each. Full, blocked,
+// already-started slots and the booking's current slot can't be picked.
+async function fillRescheduleSlots(panel) {
+  const sel = panel.querySelector(".rsslot");
+  const go = panel.querySelector(".rsgo");
+  const date = panel.querySelector(".rsdate").value;
+  go.disabled = true;
+  if (!date) { sel.innerHTML = `<option value="">Choose a date first</option>`; return; }
+  sel.innerHTML = `<option value="">Checking slots…</option>`;
+  const data = await ridersGet("day", { date }).catch(() => null);
+  if (!panel.isConnected || panel.querySelector(".rsdate").value !== date) return; // closed or date changed meanwhile
+  if (!data || !data.ok) { sel.innerHTML = `<option value="">Couldn't load slots</option>`; return; }
+
+  const now = new Date();
+  let anyOpen = false;
+  const opts = slotsForDate(new Date(date + "T00:00:00")).map(s => {
+    const used = (data.bookings || []).filter(b => b.slot === s.v && b.status !== "CANCELLED").length
+      + ((data.adjustments || {})[s.v] || 0);
+    const cap = (data.caps && data.caps[s.v] != null) ? data.caps[s.v] : (data.cap || 8);
+    const current = `${date} ${s.v}` === panel.dataset.from;
+    const blocked = (data.blocked || []).includes(s.v);
+    const past = new Date(`${date}T${s.v}:00`) <= now;
+    const full = used >= cap;
+    const off = current || blocked || past || full;
+    if (!off) anyOpen = true;
+    const tail = current ? " — current slot" : blocked ? " — BLOCKED" : past ? " — already started"
+      : full ? ` — FULL (${used}/${cap})` : ` — ${cap - used} of ${cap} left`;
+    return `<option value="${s.v}" ${off ? "disabled" : ""}>${s.label}${tail}</option>`;
+  }).join("");
+  sel.innerHTML = anyOpen
+    ? `<option value="">Choose a time slot</option>` + opts
+    : `<option value="">No open slots — pick another date</option>` + opts;
+}
+
+async function confirmReschedule(panel) {
+  const key = localStorage.getItem("lpAdminKey") || "";
+  if (!key) { alert("Enter your admin key first."); return; }
+  const date = panel.querySelector(".rsdate").value;
+  const slot = panel.querySelector(".rsslot").value;
+  if (!date || !slot) return;
+  const { receipt, type, name, from } = panel.dataset;
+  const to = `${date} ${slot}`;
+  if (!confirm(`Reschedule the ${type.toUpperCase()} for ${name} (${receipt})?\n\nFrom: ${fmtSlotStamp(from)}\nTo: ${fmtSlotStamp(to)}`)) return;
+
+  const go = panel.querySelector(".rsgo");
+  const msg = panel.querySelector(".rsmsg");
+  busy = true;
+  go.disabled = true;
+  go.textContent = "Saving…";
+  msg.textContent = "";
+  const data = await ridersPost({
+    action: "reschedule", key, receiptNo: receipt, type, date, slot,
+    updatedBy: (localStorage.getItem("lpAdminName") || "").trim(),
+  }).catch(() => ({ ok: false, error: "Couldn't reach the server. Please try again." }));
+  busy = false;
+  if (!data.ok) {
+    go.textContent = "Confirm Reschedule";
+    msg.textContent = data.error === "wrong key" ? "Wrong admin key." : (data.error || "Something went wrong.");
+    fillRescheduleSlots(panel); // availability may have changed since the list was drawn
+    return;
+  }
+  alert(`Rescheduled — ${receipt} ${type} is now ${fmtSlotStamp(to)}.`);
+  load();
+}
 
 // ===== Rider roster & attendance =====
 const rosterListEl = document.getElementById("rosterList");

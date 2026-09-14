@@ -366,6 +366,14 @@ load数 = `ceil(kg / 9)`(最低1)、最低料金は各サービスの base(Wash/
   さらに `weekend:true|false` と `weekendCap:4` を返し、管理画面はこれで土日の注記を出す。
 - `POST {action:"slotAdjust", date, slot, adjustment}` … 手動調整値を**絶対値で**設定(数値入力欄用)。
   従来の `delta: 1|-1` も引き続き使える。
+- `POST {action:"reschedule", receiptNo, type:"pickup"|"delivery", date, slot, updatedBy?}` … 既存注文の集荷または
+  デリバリーを別の日時スロットへ移動(要ADMIN_KEY)。書き換えるのは該当注文の `Pickup` / `Delivery` セル**のみ**で、
+  他の列は変更しない。枠数は Orders シートから数えるため、**旧スロットの解放と新スロットの確保が同じ書き込みで完了**する。
+  拒否条件: 満枠(CANCELLED以外のフォーム予約 + 手動調整 ≥ 上限)/ BLOCK済み / 開始済み / 現在と同じスロット /
+  その日に存在しないスロット / CANCELLED・DELIVERED の注文 / スピードの仕上がり条件違反(`scheduleRuleError()`:
+  デリバリーは集荷より後、Standard は集荷日の2日後以降・24 Hours は1日後以降、さらに `deliveryWindowError()` の時間下限)。
+  チェックと書き込みは `LockService` で直列化し、同じ最後の1枠を2人の管理者が同時に取れないようにしている。
+  成功時はオーナーと担当ライダーへ `🔁 Rescheduled` をTelegram通知(失敗しても変更自体は保存済み)。
 - `POST {action:"orderPhoto", receiptNo, name, fileName, mimeType, data(base64)}` … 洗濯物写真を
   Driveに保存し、Ordersシートの `Photo URL` 列に追記、担当ライダーへTelegram通知(§8.2)。
 - `GET ?action=slots&date=` は `{cap, caps:{slot:上限}, counts}` を返す。**`caps` がスロット別の正**で、
